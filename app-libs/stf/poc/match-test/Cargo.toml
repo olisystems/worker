@@ -7,4 +7,11 @@ edition = "2021"
 
 [dependencies]
 serde = { version = "1.0.147", default-features = false, features=["derive", "alloc"] }
-serde_json = { version = "1.0.87", default-featues = false, features=["alloc"] }
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
+
+[features]
+default = ["std"]
+std = [
+ "serde/std",
+ "serde_json/std"
+]

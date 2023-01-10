@@ -1485,6 +1485,7 @@ dependencies = [
  "pallet-parentchain",
  "pallet-sudo",
  "parity-scale-codec",
+ "poc",
  "rlp",
  "sgx_tstd",
  "sha3 0.10.6",
@@ -2458,6 +2459,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "match-test"
+version = "0.1.0"
+dependencies = [
+ "serde 1.0.152",
+ "serde_json 1.0.91",
+]
+
+[[package]]
 name = "matches"
 version = "0.1.8"
 source = "git+https://github.com/mesalock-linux/rust-std-candidates-sgx#5747bcf37f3e18687758838da0339ff0f2c83924"
@@ -2946,6 +2955,16 @@ name = "pin-utils"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
+
+[[package]]
+name = "poc"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "match-test",
+ "serde 1.0.152",
+ "serde_json 1.0.91",
+]
 
 [[package]]
 name = "postcard"

@@ -40,7 +40,7 @@ my-node-runtime = { package = "integritee-node-runtime", optional = true, git = 
 pallet-parentchain = { default-features = false, git = "https://github.com/integritee-network/pallets.git", branch = "master" }
 
 # oli/poc
-poc = {path = "poc"}
+poc = { path = "poc", default-features = false }
 
 [dev-dependencies]
 sp-keyring = { git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.36" }
@@ -83,5 +83,7 @@ std = [
     "my-node-runtime",
     "pallet-parentchain/std",
     "sp-io/std",
+    # oli/poc
+    "poc/std"
 ]
 test = []

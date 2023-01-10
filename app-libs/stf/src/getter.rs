@@ -21,7 +21,7 @@ use itp_stf_interface::ExecuteGetter;
 use itp_stf_primitives::types::{AccountId, KeyPair, Signature};
 use itp_utils::stringify::account_id_to_string;
 use log::*;
-use poc::main;
+// use poc::main;
 use sp_runtime::traits::Verify;
 use std::prelude::v1::*;
 
@@ -179,8 +179,8 @@ impl ExecuteGetter for Getter {
 				},
 
 				TrustedGetter::get_person(_who) => {
-					let output = main();
-					Some(output.encode())
+					// let output = main();
+					Some(0u32.encode())
 				},
 			},
 			Getter::public(g) => match g {
