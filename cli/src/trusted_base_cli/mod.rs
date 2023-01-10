@@ -17,8 +17,9 @@
 
 use crate::{
 	trusted_base_cli::commands::{
-		balance::BalanceCommand, get_sum::GetSumCommand, set_balance::SetBalanceCommand,
-		transfer::TransferCommand, unshield_funds::UnshieldFundsCommand,
+		balance::BalanceCommand, get_person::GetPersonCommand, get_sum::GetSumCommand,
+		set_balance::SetBalanceCommand, transfer::TransferCommand,
+		unshield_funds::UnshieldFundsCommand,
 	},
 	trusted_cli::TrustedCli,
 	trusted_command_utils::get_keystore_path,
@@ -53,6 +54,9 @@ pub enum TrustedBaseCommand {
 
 	/// Get the sum
 	GetSum(GetSumCommand),
+
+	/// Get the person
+	GetPerson(GetPersonCommand),
 }
 
 impl TrustedBaseCommand {
@@ -65,6 +69,7 @@ impl TrustedBaseCommand {
 			TrustedBaseCommand::Balance(cmd) => cmd.run(cli, trusted_cli),
 			TrustedBaseCommand::UnshieldFunds(cmd) => cmd.run(cli, trusted_cli),
 			TrustedBaseCommand::GetSum(cmd) => cmd.run(cli, trusted_cli),
+			TrustedBaseCommand::GetPerson(cmd) => cmd.run(cli, trusted_cli),
 		}
 	}
 }
