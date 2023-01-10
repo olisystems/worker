@@ -1,6 +1,6 @@
 use match_test::{from_json_string, to_json_string};
 
-pub fn main() {
+pub fn get_person() {
 	let json_string = r#"
         {
             "name": "John Doe",
