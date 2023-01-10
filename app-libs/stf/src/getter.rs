@@ -21,7 +21,7 @@ use itp_stf_interface::ExecuteGetter;
 use itp_stf_primitives::types::{AccountId, KeyPair, Signature};
 use itp_utils::stringify::account_id_to_string;
 use log::*;
-use poc::get_person;
+use poc::main;
 use sp_runtime::traits::Verify;
 use std::prelude::v1::*;
 
@@ -72,6 +72,7 @@ pub enum TrustedGetter {
 	#[cfg(feature = "evm")]
 	evm_account_storages(AccountId, H160, H256),
 	add_num(AccountId),
+	get_person(AccountId),
 }
 
 impl TrustedGetter {
@@ -87,6 +88,7 @@ impl TrustedGetter {
 			#[cfg(feature = "evm")]
 			TrustedGetter::evm_account_storages(sender_account, ..) => sender_account,
 			TrustedGetter::add_num(sender_account) => sender_account,
+			TrustedGetter::get_person(sender_account) => sender_account,
 		}
 	}
 
@@ -174,6 +176,11 @@ impl ExecuteGetter for Getter {
 					let sum = num1 + num2;
 
 					Some(sum.encode())
+				},
+
+				TrustedGetter::get_person(_who) => {
+					let output = main();
+					Some(output.encode())
 				},
 			},
 			Getter::public(g) => match g {
