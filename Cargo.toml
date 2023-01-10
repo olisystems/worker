@@ -1,6 +1,7 @@
 [workspace]
 
 members = [
+    "app-libs/stf/poc",
     "app-libs/oracle",
     "app-libs/sgx-runtime",
     "app-libs/stf",
