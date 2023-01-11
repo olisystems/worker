@@ -6,6 +6,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serde = { version = "1.0.147", features=['derive'] }
-serde_json = "1.0.87"
-match-test = { path = "match-test" }
+serde = { version = "1.0.147", default-features=false, features=['derive'] }
+serde_json = { version = "1.0.87", default-features=false }
+match-test = { path = "match-test", default-features=false }
+log = { version = "*", default-features=false}
+
+[features]
+default = ["std"]
+std = [
+    "log/std",
+    "match-test/std",
+    "serde/std",
+    "serde_json/std",
+]

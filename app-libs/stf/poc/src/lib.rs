@@ -1,4 +1,13 @@
-use match_test::{from_json_string, to_json_string};
+#![cfg_attr(not(feature = "std"), no_std)]
+
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+use log::info;
+use match_test::{self, from_json_string, to_json_string};
+
+#[cfg(not(feature = "std"))]
+use alloc::string::String;
 
 pub fn main() -> String {
 	let json_string = r#"
@@ -9,10 +18,10 @@ pub fn main() -> String {
     "#;
 
 	let person = from_json_string(json_string);
-	println!("{:?}", person);
+	info!("{:?}", person);
 
 	let json = to_json_string(&person);
-	println!("{}", json);
+	info!("{}", json);
 
 	json
 }
