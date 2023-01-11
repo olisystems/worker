@@ -37,10 +37,10 @@ impl GetPersonCommand {
 	}
 }
 
-pub(crate) fn get_person(cli: &Cli, trusted_args: &TrustedCli, arg_who: &str) -> Option<u32> {
+pub(crate) fn get_person(cli: &Cli, trusted_args: &TrustedCli, arg_who: &str) -> Option<String> {
 	debug!("arg_who = {:?}", arg_who);
 	let who = get_pair_from_str(trusted_args, arg_who);
-	let top: TrustedOperation = TrustedGetter::add_num(who.public().into())
+	let top: TrustedOperation = TrustedGetter::get_person(who.public().into())
 		.sign(&KeyPair::Sr25519(Box::new(who)))
 		.into();
 
@@ -48,9 +48,10 @@ pub(crate) fn get_person(cli: &Cli, trusted_args: &TrustedCli, arg_who: &str) ->
 	match res {
 		Some(value) => {
 			let value = u32::decode(&mut value.as_slice()).unwrap();
-			info!("Found sum: {:?}", value);
-
-			Some(value)
+			let value_bytes = value.to_be_bytes();
+			let value_str = String::from_utf8(value_bytes.to_vec()).unwrap();
+			info!("Found sum: {:?}", value_str);
+			Some(value_str)
 		},
 		None => {
 			warn!("Sum not found");
