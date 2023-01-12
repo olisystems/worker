@@ -3,12 +3,13 @@
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
+use codec::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 
 #[cfg(not(feature = "std"))]
 use alloc::string::String;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Encode, Decode)]
 pub struct Person {
 	pub name: String,
 	pub age: u8,
