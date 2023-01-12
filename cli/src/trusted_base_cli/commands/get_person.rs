@@ -22,7 +22,8 @@ use crate::{
 use codec::Decode;
 use ita_stf::{TrustedGetter, TrustedOperation};
 use itp_stf_primitives::types::KeyPair;
-use log::{debug, info, warn};
+use log::{debug, info};
+use poc::Person;
 use sp_core::Pair;
 
 #[derive(Parser)]
@@ -37,7 +38,7 @@ impl GetPersonCommand {
 	}
 }
 
-pub(crate) fn get_person(cli: &Cli, trusted_args: &TrustedCli, arg_who: &str) -> Option<String> {
+pub(crate) fn get_person(cli: &Cli, trusted_args: &TrustedCli, arg_who: &str) -> Option<Person> {
 	debug!("arg_who = {:?}", arg_who);
 	let who = get_pair_from_str(trusted_args, arg_who);
 	let top: TrustedOperation = TrustedGetter::get_person(who.public().into())
@@ -46,15 +47,15 @@ pub(crate) fn get_person(cli: &Cli, trusted_args: &TrustedCli, arg_who: &str) ->
 
 	let res = perform_trusted_operation(cli, trusted_args, &top);
 	match res {
-		Some(value) => {
-			let value = Person::decode(&mut value.as_slice());
-			// let value_bytes = value.to_be_bytes();
-			// let value_str = String::from_utf8(value_bytes.to_vec()).unwrap();
-			info!("Found sum: {:?}", value);
-			Some(value)
+		Some(value) => match Person::decode(&mut value.as_slice()) {
+			Ok(decoded_person) => Some(decoded_person),
+			Err(e) => {
+				info!("Error decoding person: {:?}", e);
+				None
+			},
 		},
 		None => {
-			warn!("Sum not found");
+			info!("Sum not found");
 			None
 		},
 	}
