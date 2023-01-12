@@ -4,7 +4,8 @@
 extern crate alloc;
 
 use log::info;
-use match_test::{self, from_json_string, to_json_string, Person};
+pub use match_test::Person;
+use match_test::{self, from_json_string, to_json_string};
 
 #[cfg(not(feature = "std"))]
 use alloc::string::String;
