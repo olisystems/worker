@@ -4,12 +4,12 @@
 extern crate alloc;
 
 use log::info;
-use match_test::{self, from_json_string, to_json_string};
+use match_test::{self, from_json_string, to_json_string, Person};
 
 #[cfg(not(feature = "std"))]
 use alloc::string::String;
 
-pub fn main() -> String {
+pub fn main() -> Person {
 	let json_string = r#"
         {
             "name": "John Doe",
@@ -23,5 +23,5 @@ pub fn main() -> String {
 	let json = to_json_string(&person);
 	info!("{}", json);
 
-	json
+	person
 }
