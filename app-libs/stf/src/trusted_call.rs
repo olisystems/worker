@@ -301,23 +301,17 @@ where
 
 				if fs::metadata(&orders_path).is_ok() {
 					info!("Orders file already exists for timestamp {}", timestamp);
-				} else {
-					let order_merkle_root = merkle_root::<Keccak256, _>(orders_encoded);
-					let pay_as_bid: MarketOutput = pay_as_bid_matching(&market_input);
+					return Ok(())
+				}
+				
+				let order_merkle_root = merkle_root::<Keccak256, _>(orders_encoded);
+				let pay_as_bid: MarketOutput = pay_as_bid_matching(&market_input);
 
-					fs::write(&orders_path, serde_json::to_string(&orders).unwrap()).map_err(
-						|e| {
-							StfError::Dispatch(format!(
-								"Writing results {}. Error: {:?}",
-								orders_file, e
-							))
-						},
-					)?;
+				fs::write(&orders_path, serde_json::to_string(&orders).unwrap()).map_err(|e| {
+					StfError::Dispatch(format!("Writing results {}. Error: {:?}", orders_file, e))
+				})?;
 
-					fs::write(
-						&results_path,
-						serde_json::to_string(&pay_as_bid).unwrap().as_bytes(),
-					)
+				fs::write(&results_path, serde_json::to_string(&pay_as_bid).unwrap().as_bytes())
 					.map_err(|e| {
 						StfError::Dispatch(format!(
 							"Writing results {}. Error: {:?}",
@@ -325,28 +319,26 @@ where
 						))
 					})?;
 
-					// store the merkle root associated with a given timestamp in the sgx state:
-					// to be defined.
-					// sp::io::set(storage_map_key());
+				// store the merkle root associated with a given timestamp in the sgx state:
+				// to be defined.
+				// sp::io::set(storage_map_key());
 
-					// Store current market output/hash in the state,
-					// so you don't have to recalculate it in the getters. (If this is needed).
-					sp_io::storage::set(b"MarketOutput", &pay_as_bid.encode());
-					sp_io::storage::set(b"OrdersMerkleRoot", &order_merkle_root.encode());
+				// Store current market output/hash in the state,
+				// so you don't have to recalculate it in the getters. (If this is needed).
+				sp_io::storage::set(b"MarketOutput", &pay_as_bid.encode());
+				sp_io::storage::set(b"OrdersMerkleRoot", &order_merkle_root.encode());
 
-					let elapsed = now.elapsed();
-					info!("Time Elapsed for PayAsBid Algorithm is: {:.2?}", elapsed);
+				let elapsed = now.elapsed();
+				info!("Time Elapsed for PayAsBid Algorithm is: {:.2?}", elapsed);
 
-					// Send proof of execution on chain.
-					// calls is in the scope from the outside
-					calls.push(OpaqueCall::from_tuple(&(
-						node_metadata_repo
-							.get_from_metadata(|m| m.publish_hash_call_indexes())??,
-						order_merkle_root,
-						Vec::<itp_types::H256>::new(), // you can ignore this for now. Clients could subscribe to the hashes here to be notified when a new hash is published.
-						b"Published merkle root of an order!".to_vec(),
-					)));
-				}
+				// Send proof of execution on chain.
+				// calls is in the scope from the outside
+				calls.push(OpaqueCall::from_tuple(&(
+					node_metadata_repo.get_from_metadata(|m| m.publish_hash_call_indexes())??,
+					order_merkle_root,
+					Vec::<itp_types::H256>::new(), // you can ignore this for now. Clients could subscribe to the hashes here to be notified when a new hash is published.
+					b"Published merkle root of an order!".to_vec(),
+				)));
 
 				Ok(())
 			},
