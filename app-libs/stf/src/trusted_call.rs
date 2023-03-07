@@ -287,12 +287,6 @@ where
 				create_dir_all(ORDERS_DIR).unwrap();
 				create_dir_all(RESULTS_DIR).unwrap();
 
-				let orders_path = format!("{}/{}", ORDERS_DIR, timestamp);
-				let results_path: String = format!("{}/{}", RESULTS_DIR, timestamp);
-				fs::write(&results_path, serde_json::to_string(pay_as_bid)).map_err(|e| {
-					StfError::Dispatch(format!("Writing results {}. Error: {:?}", orders_file, e))
-				})?;
-
 				let raw_orders = fs::read_to_string(&orders_file).map_err(|e| {
 					StfError::Dispatch(format!("Error reading {}. Error: {:?}", orders_file, e))
 				})?;
@@ -305,6 +299,12 @@ where
 
 				let order_merkle_root = merkle_root::<Keccak256, _>(orders_encoded);
 				let pay_as_bid: MarketOutput = pay_as_bid_matching(&market_input);
+
+				let orders_path = format!("{}/{}", ORDERS_DIR, timestamp);
+				let results_path = format!("{}/{}", RESULTS_DIR, timestamp);
+				fs::write(&results_path, serde_json::to_string(pay_as_bid)).map_err(|e| {
+					StfError::Dispatch(format!("Writing results {}. Error: {:?}", orders_file, e))
+				})?;
 
 				// store the merkle root associated with a given timestamp in the sgx state:
 				// to be defined.
