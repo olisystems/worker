@@ -287,7 +287,7 @@ where
 				create_dir_all(ORDERS_DIR).unwrap();
 				create_dir_all(RESULTS_DIR).unwrap();
 
-				let results_path = format!("{}/{}", ORDERS_DIR, timestamp);
+				let orders_path = format!("{}/{}", ORDERS_DIR, timestamp);
 				let results_path: String = format!("{}/{}", RESULTS_DIR, timestamp);
 				fs::write(&results_path, serde_json::to_string(pay_as_bid)).map_err(|e| {
 					StfError::Dispatch(format!("Writing results {}. Error: {:?}", orders_file, e))
