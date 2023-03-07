@@ -47,10 +47,7 @@ use ita_sgx_runtime::{AddressMapping, HashedAddressMapping};
 #[cfg(feature = "evm")]
 use crate::evm_helpers::{create_code_hash, evm_create2_address, evm_create_address};
 
-use std::{
-	fs::{create_dir_all, File},
-	path::Path,
-};
+use std::fs::create_dir_all;
 
 #[derive(Encode, Decode, Clone, Debug, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
@@ -300,18 +297,20 @@ where
 				let order_merkle_root = merkle_root::<Keccak256, _>(orders_encoded);
 				let pay_as_bid: MarketOutput = pay_as_bid_matching(&market_input);
 
+				let timestamp = &orders[0].time_slot;
+
 				let orders_path = format!("{}/{}", ORDERS_DIR, timestamp);
 				let results_path = format!("{}/{}", RESULTS_DIR, timestamp);
 				fs::write(&orders_path, serde_json::to_string(&orders).unwrap()).map_err(|e| {
 					StfError::Dispatch(format!("Writing results {}. Error: {:?}", orders_file, e))
 				})?;
-				fs::write(&results_path, serde_json::to_string(pay_as_bid)).map_err(|e| {
-					StfError::Dispatch(format!("Writing results {}. Error: {:?}", orders_file, e))
-				})?;
+				// fs::write(&results_path, serde_json::to_string(&pay_as_bid)).map_err(|e| {
+				// 	StfError::Dispatch(format!("Writing results {}. Error: {:?}", orders_file, e))
+				// })?;
 
 				// store the merkle root associated with a given timestamp in the sgx state:
 				// to be defined.
-				sp::io::set(storage_map_key());
+				// sp::io::set(storage_map_key());
 
 				// Store current market output/hash in the state,
 				// so you don't have to recalculate it in the getters. (If this is needed).
