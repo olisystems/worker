@@ -300,7 +300,7 @@ where
 				let timestamp = &orders[0].time_slot;
 
 				let orders_path = format!("{}/{}.json", ORDERS_DIR, timestamp);
-				let results_path = format!("{}/{}", RESULTS_DIR, timestamp);
+				let results_path = format!("{}/{}.json", RESULTS_DIR, timestamp);
 
 				if fs::metadata(&orders_path).is_ok() {
 					info!("Orders file already exists for timestamp {}", timestamp);
@@ -315,9 +315,13 @@ where
 					)?;
 				}
 
-				// fs::write(&results_path, serde_json::to_string(&pay_as_bid)).map_err(|e| {
-				// 	StfError::Dispatch(format!("Writing results {}. Error: {:?}", orders_file, e))
-				// })?;
+				fs::write(&results_path, serde_json::to_string(&pay_as_bid).unwrap().as_bytes())
+					.map_err(|e| {
+						StfError::Dispatch(format!(
+							"Writing results {}. Error: {:?}",
+							orders_file, e
+						))
+					})?;
 
 				// store the merkle root associated with a given timestamp in the sgx state:
 				// to be defined.
