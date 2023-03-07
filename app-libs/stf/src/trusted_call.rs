@@ -299,11 +299,22 @@ where
 
 				let timestamp = &orders[0].time_slot;
 
-				let orders_path = format!("{}/{}", ORDERS_DIR, timestamp);
+				let orders_path = format!("{}/{}.json", ORDERS_DIR, timestamp);
 				let results_path = format!("{}/{}", RESULTS_DIR, timestamp);
-				fs::write(&orders_path, serde_json::to_string(&orders).unwrap()).map_err(|e| {
-					StfError::Dispatch(format!("Writing results {}. Error: {:?}", orders_file, e))
-				})?;
+
+				if fs::metadata(&orders_path).is_ok() {
+					info!("Orders file already exists for timestamp {}", timestamp);
+				} else {
+					fs::write(&orders_path, serde_json::to_string(&orders).unwrap()).map_err(
+						|e| {
+							StfError::Dispatch(format!(
+								"Writing results {}. Error: {:?}",
+								orders_file, e
+							))
+						},
+					)?;
+				}
+
 				// fs::write(&results_path, serde_json::to_string(&pay_as_bid)).map_err(|e| {
 				// 	StfError::Dispatch(format!("Writing results {}. Error: {:?}", orders_file, e))
 				// })?;
