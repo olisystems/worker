@@ -27,7 +27,7 @@ use ita_sgx_runtime::{Runtime, System};
 use itp_node_api::metadata::{provider::AccessNodeMetadata, NodeMetadataTrait};
 use itp_node_api_metadata::pallet_teerex::TeerexCallIndexes;
 use itp_stf_interface::ExecuteCall;
-use itp_stf_primitives::types::{AccountId, KeyPair, OrdersFile, ShardIdentifier, Signature};
+use itp_stf_primitives::types::{AccountId, KeyPair, OrdersString, ShardIdentifier, Signature};
 use itp_types::OpaqueCall;
 use itp_utils::stringify::account_id_to_string;
 use log::*;
@@ -56,7 +56,7 @@ pub enum TrustedCall {
 	balance_transfer(AccountId, AccountId, Balance),
 	balance_unshield(AccountId, AccountId, Balance, ShardIdentifier), // (AccountIncognito, BeneficiaryPublicAccount, Amount, Shard)
 	balance_shield(AccountId, AccountId, Balance), // (Root, AccountIncognito, Amount)
-	pay_as_bid(AccountId, OrdersFile),
+	pay_as_bid(AccountId, OrdersString),
 	#[cfg(feature = "evm")]
 	evm_withdraw(AccountId, H160, Balance), // (Origin, Address EVM Account, Value)
 	// (Origin, Source, Target, Input, Value, Gas limit, Max fee per gas, Max priority fee per gas, Nonce, Access list)
@@ -109,7 +109,7 @@ impl TrustedCall {
 			TrustedCall::balance_transfer(sender_account, ..) => sender_account,
 			TrustedCall::balance_unshield(sender_account, ..) => sender_account,
 			TrustedCall::balance_shield(sender_account, ..) => sender_account,
-			TrustedCall::pay_as_bid(sender_account, _orders_file) => sender_account,
+			TrustedCall::pay_as_bid(sender_account, _orders_string) => sender_account,
 			#[cfg(feature = "evm")]
 			TrustedCall::evm_withdraw(sender_account, ..) => sender_account,
 			#[cfg(feature = "evm")]
@@ -275,7 +275,7 @@ where
 				Ok(())
 			},
 
-			TrustedCall::pay_as_bid(who, orders_file) => {
+			TrustedCall::pay_as_bid(who, orders_string) => {
 				let now = Instant::now();
 
 				let ORDERS_DIR = "./records/orders";
@@ -284,10 +284,7 @@ where
 				create_dir_all(ORDERS_DIR).unwrap();
 				create_dir_all(RESULTS_DIR).unwrap();
 
-				let raw_orders = fs::read_to_string(&orders_file).map_err(|e| {
-					StfError::Dispatch(format!("Error reading {}. Error: {:?}", orders_file, e))
-				})?;
-				let orders: Vec<Order> = serde_json::from_str(&raw_orders).map_err(|err| {
+				let orders: Vec<Order> = serde_json::from_str(&orders_string).map_err(|err| {
 					StfError::Dispatch(format!("Error serializing to JSON: {}", err))
 				})?;
 
@@ -303,19 +300,19 @@ where
 					info!("Orders file already exists for timestamp {}", timestamp);
 					return Ok(())
 				}
-				
+
 				let order_merkle_root = merkle_root::<Keccak256, _>(orders_encoded);
 				let pay_as_bid: MarketOutput = pay_as_bid_matching(&market_input);
 
 				fs::write(&orders_path, serde_json::to_string(&orders).unwrap()).map_err(|e| {
-					StfError::Dispatch(format!("Writing results {}. Error: {:?}", orders_file, e))
+					StfError::Dispatch(format!("Writing results {}. Error: {:?}", orders_string, e))
 				})?;
 
 				fs::write(&results_path, serde_json::to_string(&pay_as_bid).unwrap().as_bytes())
 					.map_err(|e| {
 						StfError::Dispatch(format!(
 							"Writing results {}. Error: {:?}",
-							orders_file, e
+							orders_string, e
 						))
 					})?;
 
