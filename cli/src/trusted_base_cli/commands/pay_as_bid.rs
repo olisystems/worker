@@ -26,7 +26,10 @@ use codec::Decode;
 use ita_stf::{Index, TrustedCall, TrustedGetter, TrustedOperation};
 use itp_stf_primitives::types::KeyPair;
 use log::debug;
+use simplyr_lib::Order;
 use sp_core::Pair;
+
+use crate::StfError;
 
 #[derive(Parser)]
 pub struct PayAsBidCommand {
@@ -43,14 +46,17 @@ impl PayAsBidCommand {
 
 pub(crate) fn pay_as_bid(cli: &Cli, trusted_args: &TrustedCli, arg_who: &str, orders_string: &str) {
 	debug!("arg_who = {:?}", arg_who);
+
+	let orders: Vec<Order> = serde_json::from_str(&orders_string)
+		.map_err(|err| StfError::Dispatch(format!("Error serializing to JSON: {}", err)))?;
+
 	let who = get_pair_from_str(trusted_args, arg_who);
 	let signer = get_pair_from_str(trusted_args, arg_who);
 	let (mrenclave, shard) = get_identifiers(trusted_args);
 	let nonce = get_layer_two_nonce!(signer, cli, trusted_args);
-	let top: TrustedOperation =
-		TrustedCall::pay_as_bid(who.public().into(), orders_string.to_string())
-			.sign(&KeyPair::Sr25519(Box::new(signer)), nonce, &mrenclave, &shard)
-			.into_trusted_operation(trusted_args.direct);
+	let top: TrustedOperation = TrustedCall::pay_as_bid(who.public().into(), orders)
+		.sign(&KeyPair::Sr25519(Box::new(signer)), nonce, &mrenclave, &shard)
+		.into_trusted_operation(trusted_args.direct);
 
 	let res = perform_trusted_operation(cli, trusted_args, &top);
 }
