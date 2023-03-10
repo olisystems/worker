@@ -212,7 +212,7 @@ impl ExecuteGetter for Getter {
 					let now = Instant::now();
 
 					let orders: Vec<Order> =
-						serde_json::from_str(&orders_string).expect("error serializing to JSON");
+						serde_json::from_str(orders_string).expect("error serializing to JSON");
 					let orders_encoded: Vec<Vec<u8>> = orders.iter().map(|o| o.encode()).collect();
 
 					let leaf_index_u32: u32 = (*leaf_index).into();
