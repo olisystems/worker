@@ -52,6 +52,8 @@ use crate::evm_helpers::{create_code_hash, evm_create2_address, evm_create_addre
 
 use std::fs::create_dir_all;
 
+use crate::best_energy_helpers::{write_orders, write_results, ORDERS_DIR};
+
 #[derive(Encode, Decode, Clone, Debug, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
 pub enum TrustedCall {
@@ -281,11 +283,7 @@ where
 			TrustedCall::pay_as_bid(who, orders_string) => {
 				let now = Instant::now();
 
-				let ORDERS_DIR = "./records/orders";
-				let RESULTS_DIR = "./records/market_results";
-
 				create_dir_all(ORDERS_DIR).unwrap();
-				create_dir_all(RESULTS_DIR).unwrap();
 
 				let orders: Vec<Order> = serde_json::from_str(&orders_string).map_err(|err| {
 					StfError::Dispatch(format!("Error serializing to JSON: {}", err))
@@ -297,7 +295,6 @@ where
 				let timestamp = &orders[0].time_slot;
 
 				let orders_path = format!("{}/{}.json", ORDERS_DIR, timestamp);
-				let results_path = format!("{}/{}.json", RESULTS_DIR, timestamp);
 
 				if fs::metadata(&orders_path).is_ok() {
 					info!("Orders file already exists for timestamp {}", timestamp);
@@ -307,17 +304,21 @@ where
 				let order_merkle_root = merkle_root::<Keccak256, _>(orders_encoded);
 				let pay_as_bid: MarketOutput = pay_as_bid_matching(&market_input);
 
-				fs::write(&orders_path, serde_json::to_string(&orders).unwrap()).map_err(|e| {
-					StfError::Dispatch(format!("Writing results {}. Error: {:?}", orders_string, e))
-				})?;
+				// fs::write(&orders_path, serde_json::to_string(&orders).unwrap()).map_err(|e| {
+				// 	StfError::Dispatch(format!("Writing results {}. Error: {:?}", orders_string, e))
+				// })?;
 
-				fs::write(&results_path, serde_json::to_string(&pay_as_bid).unwrap().as_bytes())
-					.map_err(|e| {
-						StfError::Dispatch(format!(
-							"Writing results {}. Error: {:?}",
-							orders_string, e
-						))
-					})?;
+				// fs::write(&results_path, serde_json::to_string(&pay_as_bid).unwrap().as_bytes())
+				// 	.map_err(|e| {
+				// 		StfError::Dispatch(format!(
+				// 			"Writing results {}. Error: {:?}",
+				// 			orders_string, e
+				// 		))
+				// 	})?;
+
+				write_orders(timestamp, &orders)?;
+
+				write_results(timestamp, pay_as_bid)?;
 
 				// store the merkle root associated with a given timestamp in the sgx state:
 				// to be defined.
