@@ -42,7 +42,7 @@ impl PayAsBidProofCommand {
 				cli,
 				trusted_args,
 				&self.account,
-				self.orders_string,
+				self.orders_string.clone(),
 				self.leaf_index
 			))
 			.unwrap()
