@@ -50,8 +50,6 @@ use ita_sgx_runtime::{AddressMapping, HashedAddressMapping};
 #[cfg(feature = "evm")]
 use crate::evm_helpers::{create_code_hash, evm_create2_address, evm_create_address};
 
-use std::fs::create_dir_all;
-
 use crate::best_energy_helpers::{write_orders, write_results, ORDERS_DIR};
 
 #[derive(Encode, Decode, Clone, Debug, PartialEq, Eq)]
