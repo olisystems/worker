@@ -56,7 +56,6 @@ pub fn get_leaf_index_for_actor(actor_id: &str, orders: &[Order]) -> Option<usiz
 #[cfg(test)]
 mod test {
 	use super::*;
-	use binary_merkle_tree::{merkle_proof, MerkleProof};
 
 	#[test]
 	fn get_leaf_index_of_orders_works() {
@@ -75,7 +74,7 @@ mod test {
 		let actor_0_order = orders[0].clone();
 
 		match get_merkle_proof_for_actor("actor_0", &orders) {
-			Ok(proof) => {
+			Ok(Some(proof)) => {
 				// Test that we have returned the correct leaf. This is what a
 				// client can do to ensure that it has received a proof for the
 				// expected leaf.
