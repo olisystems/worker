@@ -11,7 +11,6 @@
 	limitations under the License.
 */
 
-use crate::StfError;
 use binary_merkle_tree::{merkle_proof, MerkleProof};
 use codec::{Decode, Encode};
 use ita_sgx_runtime::System;
@@ -24,7 +23,7 @@ use log::*;
 use serde::{Deserialize, Serialize};
 use simplyr_lib::Order;
 use sp_runtime::traits::{Keccak256, Verify};
-use std::{format, fs, prelude::v1::*, time::Instant};
+use std::{prelude::v1::*, time::Instant};
 
 #[cfg(feature = "evm")]
 use crate::evm_helpers::{get_evm_account, get_evm_account_codes, get_evm_account_storages};

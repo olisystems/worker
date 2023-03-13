@@ -280,7 +280,7 @@ where
 				Ok(())
 			},
 
-			TrustedCall::pay_as_bid(who, orders_string) => {
+			TrustedCall::pay_as_bid(_who, orders_string) => {
 				let now = Instant::now();
 
 				create_dir_all(ORDERS_DIR).unwrap();
