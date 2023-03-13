@@ -1,6 +1,7 @@
 use crate::{MerkleProofWithCodec, StfError};
 use binary_merkle_tree::merkle_proof;
 use codec::Encode;
+use log::info;
 use simplyr_lib::{MarketOutput, Order};
 use sp_core::H256;
 use sp_runtime::traits::Keccak256;
@@ -11,20 +12,32 @@ pub static RESULTS_DIR: &str = "./records/market_results";
 
 pub fn write_orders(timestamp: &str, orders: &[Order]) -> Result<(), StfError> {
 	let orders_path = format!("{}/{}.json", ORDERS_DIR, timestamp);
-	fs::write(&orders_path, serde_json::to_string(&orders).unwrap())
-		.map_err(|e| StfError::Dispatch(format!("Writing orders {:?}. Error: {:?}", orders, e)))
+	match serde_json::to_string(&orders) {
+		Ok(serialized_orders) => match fs::write(&orders_path, serialized_orders) {
+			Ok(_) => Ok(()),
+			Err(e) =>
+				Err(StfError::Dispatch(format!("Writing orders {:?}. Error: {:?}", orders, e))),
+		},
+		Err(e) =>
+			Err(StfError::Dispatch(format!("Serializing orders {:?}. Error: {:?}", orders, e))),
+	}
 }
 
 pub fn write_results(timestamp: &str, market_results: MarketOutput) -> Result<(), StfError> {
 	let results_path = format!("{}/{}.json", RESULTS_DIR, timestamp);
-	fs::write(&results_path, serde_json::to_string(&market_results).unwrap().as_bytes()).map_err(
-		|e| {
-			StfError::Dispatch(format!(
+	match serde_json::to_string(&market_results) {
+		Ok(serialized_results) => match fs::write(&results_path, serialized_results.as_bytes()) {
+			Ok(_) => Ok(()),
+			Err(e) => Err(StfError::Dispatch(format!(
 				"Writing market results {:?}. Error: {:?}",
 				market_results, e
-			))
+			))),
 		},
-	)
+		Err(e) => Err(StfError::Dispatch(format!(
+			"Serializing market results {:?}. Error: {:?}",
+			market_results, e
+		))),
+	}
 }
 
 /// Gets the merkle proof of an `actor_id` if it is in the order set.
@@ -61,13 +74,19 @@ mod test {
 		let orders = default_orders();
 		let actor_0_order = orders[0].clone();
 
-		let proof = get_merkle_proof_for_actor("actor_0", &orders).unwrap();
-
-		// Test that we have returned the correct leaf. This is what a
-		// client can do to ensure that it has received a proof for the
-		// expected leaf.
-		assert_eq!(proof.leaf, actor_0_order.encode());
-		assert_eq!(proof.leaf_index, 0);
+		match get_merkle_proof_for_actor("actor_0", &orders) {
+			Ok(proof) => {
+				// Test that we have returned the correct leaf. This is what a
+				// client can do to ensure that it has received a proof for the
+				// expected leaf.
+				assert_eq!(proof.leaf, actor_0_order.encode());
+				assert_eq!(proof.leaf_index, 0);
+			},
+			Err(e) => Err(StfError::Dispatch(format!(
+				"Getting Merkle Proof {:?}. Error: {:?}",
+				orders, e
+			))),
+		}
 	}
 }
 
@@ -100,7 +119,13 @@ pub fn default_orders() -> Vec<Order> {
       "price_euro_per_kwh": 0.15
     }]"#;
 
-	serde_json::from_str(orders_raw).unwrap()
+	match serde_json::from_str::<Vec<Order>>(orders_raw) {
+		Ok(orders) => orders,
+		Err(e) => {
+			info!("Creating raw orders {:?}. Error: {:?}", orders_raw, e);
+			Vec::new()
+		},
+	}
 }
 
 /// SGX storage helpers for all best energy data.
