@@ -74,12 +74,20 @@ mod test {
 		let actor_0_order = orders[0].clone();
 
 		match get_merkle_proof_for_actor("actor_0", &orders) {
-			Ok(Some(proof)) => {
-				// Test that we have returned the correct leaf. This is what a
-				// client can do to ensure that it has received a proof for the
-				// expected leaf.
-				assert_eq!(proof.leaf, actor_0_order.encode());
-				assert_eq!(proof.leaf_index, 0);
+			Ok(proof) => {
+				match proof {
+					Some(proof) => {
+						// Test that we have returned the correct leaf. This is what a
+						// client can do to ensure that it has received a proof for the
+						// expected leaf.
+						assert_eq!(proof.leaf, actor_0_order.encode());
+						assert_eq!(proof.leaf_index, 0);
+					},
+
+					None => {
+						//
+					},
+				}
 			},
 			Err(e) => Err(StfError::Dispatch(format!(
 				"Getting Merkle Proof {:?}. Error: {:?}",
