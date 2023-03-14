@@ -31,7 +31,10 @@ pub fn write_results(timestamp: &str, market_results: MarketOutput) -> Result<()
 	})?;
 
 	fs::write(&results_path, results_serialized.as_bytes()).map_err(|e| {
-		StfError::Dispatch(format!("Writing market results {:?}. Error: {:?}", results_serialized, e))
+		StfError::Dispatch(format!(
+			"Writing market results {:?}. Error: {:?}",
+			results_serialized, e
+		))
 	})
 }
 
