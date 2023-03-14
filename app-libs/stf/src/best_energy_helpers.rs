@@ -73,27 +73,13 @@ mod test {
 		let orders = default_orders();
 		let actor_0_order = orders[0].clone();
 
-		match get_merkle_proof_for_actor("actor_0", &orders) {
-			Ok(proof) => {
-				match proof {
-					Some(proof) => {
-						// Test that we have returned the correct leaf. This is what a
-						// client can do to ensure that it has received a proof for the
-						// expected leaf.
-						assert_eq!(proof.leaf, actor_0_order.encode());
-						assert_eq!(proof.leaf_index, 0);
-					},
+		let proof = get_merkle_proof_for_actor("actor_0", &orders).unwrap();
 
-					None => {
-						//
-					},
-				}
-			},
-			Err(e) => Err(StfError::Dispatch(format!(
-				"Getting Merkle Proof {:?}. Error: {:?}",
-				orders, e
-			))),
-		}
+		// Test that we have returned the correct leaf. This is what a
+		// client can do to ensure that it has received a proof for the
+		// expected leaf.
+		assert_eq!(proof.leaf, actor_0_order.encode());
+		assert_eq!(proof.leaf_index, 0);
 	}
 }
 
@@ -126,13 +112,7 @@ pub fn default_orders() -> Vec<Order> {
       "price_euro_per_kwh": 0.15
     }]"#;
 
-	match serde_json::from_str::<Vec<Order>>(orders_raw) {
-		Ok(orders) => orders,
-		Err(e) => {
-			info!("Creating raw orders {:?}. Error: {:?}", orders_raw, e);
-			Vec::new()
-		},
-	}
+	serde_json::from_str(orders_raw).unwrap()
 }
 
 /// SGX storage helpers for all best energy data.
