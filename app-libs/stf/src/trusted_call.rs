@@ -281,14 +281,9 @@ where
 			TrustedCall::pay_as_bid(_who, orders_string) => {
 				let now = Instant::now();
 
-				match fs::create_dir_all(ORDERS_DIR) {
-					Ok(_) => {},
-					Err(e) =>
-						return Err(StfError::Dispatch(format!(
-							"Creating orders directory. Error: {:?}",
-							e
-						))),
-				}
+				fs::create_dir_all(ORDERS_DIR).map_err(|err| {
+					StfError::Dispatch(format!("Creating orders directory. Error: {:?}", err))
+				})?;
 
 				let orders: Vec<Order> = serde_json::from_str(&orders_string).map_err(|err| {
 					StfError::Dispatch(format!("Error serializing to JSON: {}", err))

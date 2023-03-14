@@ -1,7 +1,6 @@
 use crate::{MerkleProofWithCodec, StfError};
 use binary_merkle_tree::merkle_proof;
 use codec::Encode;
-use log::info;
 use simplyr_lib::{MarketOutput, Order};
 use sp_core::H256;
 use sp_runtime::traits::Keccak256;
@@ -12,32 +11,28 @@ pub static RESULTS_DIR: &str = "./records/market_results";
 
 pub fn write_orders(timestamp: &str, orders: &[Order]) -> Result<(), StfError> {
 	let orders_path = format!("{}/{}.json", ORDERS_DIR, timestamp);
-	match serde_json::to_string(&orders) {
-		Ok(serialized_orders) => match fs::write(&orders_path, serialized_orders) {
-			Ok(_) => Ok(()),
-			Err(e) =>
-				Err(StfError::Dispatch(format!("Writing orders {:?}. Error: {:?}", orders, e))),
-		},
-		Err(e) =>
-			Err(StfError::Dispatch(format!("Serializing orders {:?}. Error: {:?}", orders, e))),
-	}
+
+	let orders_serialized = serde_json::to_string(&orders).map_err(|e| {
+		StfError::Dispatch(format!("Serializing orders {:?}. Error: {:?}", orders, e))
+	})?;
+
+	fs::write(&orders_path, orders_serialized)
+		.map_err(|e| StfError::Dispatch(format!("Writing orders {:?}. Error: {:?}", orders, e)))
 }
 
 pub fn write_results(timestamp: &str, market_results: MarketOutput) -> Result<(), StfError> {
 	let results_path = format!("{}/{}.json", RESULTS_DIR, timestamp);
-	match serde_json::to_string(&market_results) {
-		Ok(serialized_results) => match fs::write(&results_path, serialized_results.as_bytes()) {
-			Ok(_) => Ok(()),
-			Err(e) => Err(StfError::Dispatch(format!(
-				"Writing market results {:?}. Error: {:?}",
-				market_results, e
-			))),
-		},
-		Err(e) => Err(StfError::Dispatch(format!(
+
+	let results_serialized = serde_json::to_string(&market_results).map_err(|e| {
+		StfError::Dispatch(format!(
 			"Serializing market results {:?}. Error: {:?}",
 			market_results, e
-		))),
-	}
+		))
+	})?;
+
+	fs::write(&results_path, results_serialized.as_bytes()).map_err(|e| {
+		StfError::Dispatch(format!("Writing market results {:?}. Error: {:?}", results_serialized, e))
+	})
 }
 
 /// Gets the merkle proof of an `actor_id` if it is in the order set.
