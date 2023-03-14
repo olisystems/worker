@@ -222,8 +222,7 @@ impl ExecuteGetter for Getter {
 						},
 					};
 
-					let leaf_index_u32 = leaf_index as u32;
-					if leaf_index_u32 >= orders.len() as u32 {
+					if leaf_index >= orders.len() {
 						info!(
 							"leaf_index out of range: {} (orders length: {})",
 							leaf_index,
