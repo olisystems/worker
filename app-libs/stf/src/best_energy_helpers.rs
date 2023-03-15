@@ -4,10 +4,26 @@ use codec::Encode;
 use simplyr_lib::{MarketOutput, Order};
 use sp_core::H256;
 use sp_runtime::traits::Keccak256;
-use std::{format, fs, vec::Vec};
+use std::{format, fs, fs::File, io::Read, vec::Vec};
 
 pub static ORDERS_DIR: &str = "./records/orders";
 pub static RESULTS_DIR: &str = "./records/market_results";
+
+pub fn get_orders(timestamp: &str, actor_id: &str) -> Result<(Vec<Vec<u8>>, usize), StfError> {
+	let json_filename = format!("{}/{}.json", ORDERS_DIR, timestamp);
+	let mut file = File::open(json_filename);
+	let mut contents = String::new();
+	file.read_to_string(&mut contents);
+
+	let orders: Vec<Order> = serde_json::from_str(&contents).expect("error serializing to JSON");
+	let orders_encoded: Vec<Vec<u8>> = orders.iter().map(|o| o.encode()).collect();
+	let index = orders
+		.iter()
+		.position(|o| o.actor_id.to_string() == actor_id.to_string())
+		.expect("Actor Id Error");
+
+	Ok((orders_encoded, index))
+}
 
 pub fn write_orders(timestamp: &str, orders: &[Order]) -> Result<(), StfError> {
 	let orders_path = format!("{}/{}.json", ORDERS_DIR, timestamp);

@@ -61,7 +61,7 @@ pub(crate) fn pay_as_bid_proof(
 	let who = get_pair_from_str(trusted_args, arg_who);
 
 	let top: TrustedOperation =
-		TrustedGetter::pay_as_bid_proof(who.public().into(), orders_string, leaf_index)
+		TrustedGetter::pay_as_bid_proof(who.public().into(), orders_string, leaf_index.to_string())
 			.sign(&KeyPair::Sr25519(Box::new(who)))
 			.into();
 
