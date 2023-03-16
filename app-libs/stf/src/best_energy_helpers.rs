@@ -23,7 +23,7 @@ pub fn get_orders_index(
 	let index = orders
 		.iter()
 		.position(|o| o.actor_id == actor_id)
-		.ok_or(StfError::Dispatch(format!("Leaf Index {:?}. Error: {:?}", actor_id, e)))?;
+		.ok_or(StfError::Dispatch(format!("Leaf Index error: {:?}", actor_id)))?;
 
 	let orders_encoded: Vec<Vec<u8>> = orders.iter().map(|o| o.encode()).collect();
 
