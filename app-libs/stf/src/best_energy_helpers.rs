@@ -9,7 +9,10 @@ use std::{format, fs, vec::Vec};
 pub static ORDERS_DIR: &str = "./records/orders";
 pub static RESULTS_DIR: &str = "./records/market_results";
 
-pub fn get_orders_index(timestamp: &str, actor_id: &str) -> Result<(Vec<Vec<u8>>, usize), StfError> {
+pub fn get_orders_index(
+	timestamp: &str,
+	actor_id: &str,
+) -> Result<(Vec<Vec<u8>>, usize), StfError> {
 	let file = format!("{}/{}.json", ORDERS_DIR, timestamp);
 	let content = fs::read_to_string(file)
 		.map_err(|e| StfError::Dispatch(format!("Reading Orders File Error: {:?}", e)))?;
@@ -20,7 +23,7 @@ pub fn get_orders_index(timestamp: &str, actor_id: &str) -> Result<(Vec<Vec<u8>>
 	let index = orders
 		.iter()
 		.position(|o| o.actor_id == actor_id)
-		.ok_or(StfError::Dispatch(format!("Leaf Index Error: {:?}", actor_id)))?;
+		.ok_or(StfError::Dispatch(format!("Leaf Index {:?}. Error: {:?}", actor_id, e)))?;
 
 	let orders_encoded: Vec<Vec<u8>> = orders.iter().map(|o| o.encode()).collect();
 

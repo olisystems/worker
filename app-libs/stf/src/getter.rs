@@ -11,7 +11,7 @@
 	limitations under the License.
 */
 
-use crate::{best_energy_helpers::get_orders_index, StfError};
+use crate::best_energy_helpers::get_orders_index;
 use binary_merkle_tree::{merkle_proof, MerkleProof};
 use codec::{Decode, Encode};
 use ita_sgx_runtime::System;
@@ -23,7 +23,7 @@ use itp_utils::stringify::account_id_to_string;
 use log::*;
 use serde::{Deserialize, Serialize};
 use sp_runtime::traits::{Keccak256, Verify};
-use std::{format, prelude::v1::*, time::Instant};
+use std::{prelude::v1::*, time::Instant};
 
 #[cfg(feature = "evm")]
 use crate::evm_helpers::{get_evm_account, get_evm_account_codes, get_evm_account_storages};
@@ -209,19 +209,22 @@ impl ExecuteGetter for Getter {
 				TrustedGetter::pay_as_bid_proof(_who, timestamp, actor_id) => {
 					let now = Instant::now();
 
-					let (orders, index) = get_orders_index(timestamp, &actor_id)
-						.map_err(|e| {
-							StfError::Dispatch(format!("Getting Orders and Index Error: {:?}", e))
-						})
-						.ok()?;
+					// log the error and return none.
+					if let Ok((orders, index)) = get_orders_index(timestamp, &actor_id) {
+						let proof: MerkleProofWithCodec<_, _> =
+							merkle_proof::<Keccak256, _, _>(orders, index).into();
 
-					let proof: MerkleProofWithCodec<_, _> =
-						merkle_proof::<Keccak256, _, _>(orders, index).into();
+						let elapsed = now.elapsed();
+						info!("Time Elapsed for PayAsBid Proof is: {:.2?}", elapsed);
 
-					let elapsed = now.elapsed();
-					info!("Time Elapsed for PayAsBid Proof is: {:.2?}", elapsed);
+						Some(proof.encode())
+					} else {
+						if let Err(e) = get_orders_index(timestamp, actor_id) {
+							log::error!("Getting Orders and Index Error: {:?}", e);
+						}
 
-					Some(proof.encode())
+						return None
+					}
 				},
 			},
 			Getter::public(g) => match g {
