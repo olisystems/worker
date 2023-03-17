@@ -16,7 +16,7 @@ pub fn get_merkle_proof_for_actor_from_file(
 	let orders = read_orders(timestamp)?;
 
 	get_merkle_proof_for_actor(actor_id, &orders)
-		.ok_or(StfError::Dispatch(format!("Leaf Index error: {:?}", actor_id)))
+		.ok_or_else(|| StfError::Dispatch(format!("Leaf Index error: {:?}", actor_id)))
 }
 
 pub fn read_orders(timestamp: &str) -> Result<Vec<Order>, StfError> {

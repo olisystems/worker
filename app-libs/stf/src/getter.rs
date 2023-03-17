@@ -209,7 +209,7 @@ impl ExecuteGetter for Getter {
 				TrustedGetter::pay_as_bid_proof(_who, timestamp, actor_id) => {
 					let now = Instant::now();
 
-					let proof = match get_merkle_proof_for_actor_from_file(timestamp, &actor_id) {
+					let proof = match get_merkle_proof_for_actor_from_file(timestamp, actor_id) {
 						Ok(proof) => proof,
 						Err(e) => {
 							log::error!("Getting Orders and Index Error, {:?}", e);
