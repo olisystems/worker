@@ -12,7 +12,7 @@
 */
 
 use crate::best_energy_helpers::get_merkle_proof_for_actor_from_file;
-use binary_merkle_tree::{merkle_proof, MerkleProof};
+use binary_merkle_tree::MerkleProof;
 use codec::{Decode, Encode};
 use ita_sgx_runtime::System;
 #[cfg(feature = "evm")]
@@ -22,7 +22,7 @@ use itp_stf_primitives::types::{AccountId, ActorId, KeyPair, Signature, Timestam
 use itp_utils::stringify::account_id_to_string;
 use log::*;
 use serde::{Deserialize, Serialize};
-use sp_runtime::traits::{Keccak256, Verify};
+use sp_runtime::traits::Verify;
 use std::{prelude::v1::*, time::Instant};
 
 #[cfg(feature = "evm")]
@@ -209,14 +209,13 @@ impl ExecuteGetter for Getter {
 				TrustedGetter::pay_as_bid_proof(_who, timestamp, actor_id) => {
 					let now = Instant::now();
 
-					let (orders, index) =
-						match get_merkle_proof_for_actor_from_file(timestamp, &actor_id) {
-							Ok((orders, index)) => (orders, index),
-							Err(e) => {
-								log::error!("Getting Orders and Index Error, {:?}", e);
-								return None
-							},
-						};
+					let proof = match get_merkle_proof_for_actor_from_file(timestamp, &actor_id) {
+						Ok(proof) => proof,
+						Err(e) => {
+							log::error!("Getting Orders and Index Error, {:?}", e);
+							return None
+						},
+					};
 
 					let elapsed = now.elapsed();
 					info!("Time Elapsed for PayAsBid Proof is: {:.2?}", elapsed);

@@ -12,12 +12,11 @@ pub static RESULTS_DIR: &str = "./records/market_results";
 pub fn get_merkle_proof_for_actor_from_file(
 	timestamp: &str,
 	actor_id: &str,
-) -> Result<(Vec<Order>, usize), StfError> {
+) -> Result<MerkleProofWithCodec<H256, Vec<u8>>, StfError> {
 	let orders = read_orders(timestamp)?;
-	let index = get_merkle_proof_for_actor(actor_id, &orders)
-		.ok_or(StfError::Dispatch(format!("Leaf Index error: {:?}", actor_id)))?;
 
-	Ok((orders, index))
+	get_merkle_proof_for_actor(actor_id, &orders)
+		.ok_or(StfError::Dispatch(format!("Leaf Index error: {:?}", actor_id)))
 }
 
 pub fn read_orders(timestamp: &str) -> Result<Vec<Order>, StfError> {
