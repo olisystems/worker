@@ -11,7 +11,7 @@
 	limitations under the License.
 */
 
-use crate::best_energy_helpers::get_orders_and_index_from_file;
+use crate::best_energy_helpers::get_merkle_proof_for_actor_from_file;
 use binary_merkle_tree::{merkle_proof, MerkleProof};
 use codec::{Decode, Encode};
 use ita_sgx_runtime::System;
@@ -209,19 +209,14 @@ impl ExecuteGetter for Getter {
 				TrustedGetter::pay_as_bid_proof(_who, timestamp, actor_id) => {
 					let now = Instant::now();
 
-					let (orders, index) = match get_orders_and_index_from_file(timestamp, &actor_id)
-					{
-						Ok((orders, index)) => (orders, index),
-						Err(e) => {
-							log::error!("Getting Orders and Index Error, {:?}", e);
-							return None
-						},
-					};
-
-					// Don't call `collect` here to save `O(n)` operations.
-					let orders_encoded_iterator = orders.iter().map(Encode::encode);
-					let proof: MerkleProofWithCodec<_, _> =
-						merkle_proof::<Keccak256, _, _>(orders_encoded_iterator, index).into();
+					let (orders, index) =
+						match get_merkle_proof_for_actor_from_file(timestamp, &actor_id) {
+							Ok((orders, index)) => (orders, index),
+							Err(e) => {
+								log::error!("Getting Orders and Index Error, {:?}", e);
+								return None
+							},
+						};
 
 					let elapsed = now.elapsed();
 					info!("Time Elapsed for PayAsBid Proof is: {:.2?}", elapsed);
