@@ -209,22 +209,23 @@ impl ExecuteGetter for Getter {
 				TrustedGetter::pay_as_bid_proof(_who, timestamp, actor_id) => {
 					let now = Instant::now();
 
-					// log the error and return none.
-					if let Ok((orders, index)) = get_orders_index(timestamp, &actor_id) {
-						let proof: MerkleProofWithCodec<_, _> =
-							merkle_proof::<Keccak256, _, _>(orders, index).into();
+					let (orders, index) = match get_orders_index(timestamp, &actor_id) {
+						Ok((orders, index)) => (orders, index),
+						Err(e) => {
+							log::error!("Getting Orders and Index Error, {:?}", e);
+							return None
+						},
+					};
 
-						let elapsed = now.elapsed();
-						info!("Time Elapsed for PayAsBid Proof is: {:.2?}", elapsed);
+					// Don't call `collect` here to save `O(n)` operations.
+					let orders_encoded_iterator = orders.iter().map(Encode::encode);
+					let proof: MerkleProofWithCodec<_, _> =
+						merkle_proof::<Keccak256, _, _>(orders_encoded_iterator, index).into();
 
-						Some(proof.encode())
-					} else {
-						if let Err(e) = get_orders_index(timestamp, actor_id) {
-							log::error!("Getting Orders and Index Error: {:?}", e);
-						}
+					let elapsed = now.elapsed();
+					info!("Time Elapsed for PayAsBid Proof is: {:.2?}", elapsed);
 
-						return None
-					}
+					Some(proof.encode())
 				},
 			},
 			Getter::public(g) => match g {

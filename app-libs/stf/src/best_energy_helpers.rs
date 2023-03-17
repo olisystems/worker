@@ -9,25 +9,22 @@ use std::{format, fs, vec::Vec};
 pub static ORDERS_DIR: &str = "./records/orders";
 pub static RESULTS_DIR: &str = "./records/market_results";
 
-pub fn get_orders_index(
-	timestamp: &str,
-	actor_id: &str,
-) -> Result<(Vec<Vec<u8>>, usize), StfError> {
+pub fn get_orders_index(timestamp: &str, actor_id: &str) -> Result<(Vec<Order>, usize), StfError> {
+	let orders = read_orders(timestamp)?;
+	let index = get_leaf_index_for_actor(actor_id, &orders)
+		.ok_or(StfError::Dispatch(format!("Leaf Index error: {:?}", actor_id)))?;
+
+	Ok((orders, index))
+}
+
+pub fn read_orders(timestamp: &str) -> Result<Vec<Order>, StfError> {
 	let file = format!("{}/{}.json", ORDERS_DIR, timestamp);
 	let content = fs::read_to_string(file)
 		.map_err(|e| StfError::Dispatch(format!("Reading Orders File Error: {:?}", e)))?;
-	let orders: Vec<Order> = serde_json::from_str(&content).map_err(|e| {
-		StfError::Dispatch(format!("Serializing Orders {:?}. Error: {:?}", content, e))
-	})?;
 
-	let index = orders
-		.iter()
-		.position(|o| o.actor_id == actor_id)
-		.ok_or(StfError::Dispatch(format!("Leaf Index error: {:?}", actor_id)))?;
-
-	let orders_encoded: Vec<Vec<u8>> = orders.iter().map(|o| o.encode()).collect();
-
-	Ok((orders_encoded, index))
+	serde_json::from_str(&content).map_err(|e| {
+		StfError::Dispatch(format!("Deserializing Orders {:?}. Error: {:?}", content, e))
+	})
 }
 
 pub fn write_orders(timestamp: &str, orders: &[Order]) -> Result<(), StfError> {
