@@ -9,7 +9,12 @@ use std::{format, fs, vec::Vec};
 pub static ORDERS_DIR: &str = "./records/orders";
 pub static RESULTS_DIR: &str = "./records/market_results";
 
-pub fn get_orders_index(timestamp: &str, actor_id: &str) -> Result<(Vec<Order>, usize), StfError> {
+/// Reads the market file corresponding to the `timestamp`
+/// and the index of the given `actor_id`.
+pub fn get_orders_and_index_from_file(
+	timestamp: &str,
+	actor_id: &str,
+) -> Result<(Vec<Order>, usize), StfError> {
 	let orders = read_orders(timestamp)?;
 	let index = get_leaf_index_for_actor(actor_id, &orders)
 		.ok_or(StfError::Dispatch(format!("Leaf Index error: {:?}", actor_id)))?;
