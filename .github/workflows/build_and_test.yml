@@ -145,6 +145,9 @@ jobs:
           - test: M6
             flavor_id: offchain-worker
             demo_name: demo-indirect-invocation
+          - test: BestEnergy
+            flavor_id: offchain-worker
+            demo_name: demo-energy-market
 
     steps:
       - uses: actions/checkout@v3
