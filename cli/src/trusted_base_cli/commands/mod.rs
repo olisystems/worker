@@ -6,3 +6,4 @@ pub mod set_balance;
 pub mod transfer;
 pub mod unshield_funds;
 pub mod verify_proof;
+pub mod get_market_results;
