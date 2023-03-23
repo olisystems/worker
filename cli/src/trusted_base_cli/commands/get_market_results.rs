@@ -16,13 +16,12 @@ use crate::{
 	trusted_operation::perform_trusted_operation, Cli,
 };
 
+use codec::Decode;
 use ita_stf::{TrustedGetter, TrustedOperation};
 use itp_stf_primitives::types::KeyPair;
 use log::debug;
 use simplyr_lib::MarketOutput;
 use sp_core::Pair;
-
-use codec;
 
 #[derive(Parser)]
 pub struct GetMarketResultsCommand {
@@ -64,9 +63,9 @@ pub(crate) fn get_market_results(
 	let res = perform_trusted_operation(cli, trusted_args, &top);
 
 	match res {
-		Some(market_results) => {
-			let rus: MarketOutput = MarketOutput { matches: market_results };
-			rus
+		Some(market_results) => match MarketOutput::decode(&mut market_results.as_slice()) {
+			Ok(market_output) => market_output,
+			Err(err) => panic!("Error deserializing market results: {}", err),
 		},
 		None => {
 			panic!("Results not found");
