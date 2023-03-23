@@ -62,7 +62,7 @@ pub enum TrustedBaseCommand {
 	VerifyProof(VerifyMerkleProofCommand),
 
 	/// Get Market Results Command
-	MarketResults(GetMarketResultsCommand)
+	GetMarketResults(GetMarketResultsCommand),
 }
 
 impl TrustedBaseCommand {
@@ -78,7 +78,7 @@ impl TrustedBaseCommand {
 			TrustedBaseCommand::PayAsBid(cmd) => cmd.run(cli, trusted_cli),
 			TrustedBaseCommand::PayAsBidProof(cmd) => cmd.run(cli, trusted_cli),
 			TrustedBaseCommand::VerifyProof(cmd) => cmd.run(cli, trusted_cli),
-			TrustedBaseCommand::MarketResults(cmd) => cmd.run(cli, trusted_cli),
+			TrustedBaseCommand::GetMarketResults(cmd) => cmd.run(cli, trusted_cli),
 		}
 	}
 }
