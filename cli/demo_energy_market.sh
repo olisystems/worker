@@ -23,7 +23,7 @@ set -euo pipefail
 # usage:
 #  demo_energy_market.sh -p <NODEPORT> -P <WORKERPORT> -t -O <path-to-order-file>
 
-while getopts ":p:P:u:V:C:O:" opt; do
+while getopts ":p:P:u:V:C:O:T:" opt; do
     case $opt in
         p)
             NPORT=$OPTARG
@@ -43,6 +43,13 @@ while getopts ":p:P:u:V:C:O:" opt; do
         O)
             ORDERS_FILE=$OPTARG
             ;;
+        T)
+            TIMESTAMP=$OPTARG
+            ;;
+        *)
+            echo "Invalid Argument Supplied"
+            exit 1
+            ;;
     esac
 done
 
@@ -55,17 +62,21 @@ WORKER1URL=${WORKER1URL:-"wss://127.0.0.1"}
 
 CLIENT_BIN=${CLIENT_BIN:-"./../bin/integritee-cli"}
 
-TIMESTAMP="2022-03-04T05:06:07+00:00"
+# Timestamp needs to match the one from the provided orders file
+TIMESTAMP=${TIMESTAMP:-"2022-03-04T05:06:07+00:00"}
 ORDERS_FILE=${ORDERS_FILE:-"../bin/orders/order_10_users.json"}
-FILE_CONTENTS=$(cat "$ORDERS_FILE" | tr -d '[:space:]')
-ORDERS_STRING="$FILE_CONTENTS"
-
-echo ${ORDERS_STRING}
 
 echo "Using client binary ${CLIENT_BIN}"
 echo "Using node uri ${NODEURL}:${NPORT}"
 echo "Using trusted-worker uri ${WORKER1URL}:${WORKER1PORT}"
 echo ""
+echo "Using ORDERS_FILE: ${ORDERS_FILE}"
+echo "Using TIMESTAMP: ${TIMESTAMP}"
+echo ""
+
+FILE_CONTENTS=$(cat "$ORDERS_FILE" | tr -d '[:space:]')
+ORDERS_STRING="$FILE_CONTENTS"
+#echo ${ORDERS_STRING}
 
 CLIENT="${CLIENT_BIN} -p ${NPORT} -P ${WORKER1PORT} -u ${NODEURL} -U ${WORKER1URL}"
 read -r MRENCLAVE <<< "$($CLIENT list-workers | awk '/  MRENCLAVE: / { print $2; exit }')"
