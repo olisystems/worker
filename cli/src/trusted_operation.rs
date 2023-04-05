@@ -334,7 +334,8 @@ fn connection_can_be_closed(top_status: TrustedOperationStatus) -> bool {
 	!matches!(
 		top_status,
 		// TrustedOperationStatus::Submitted
-		|TrustedOperationStatus::Future| TrustedOperationStatus::Ready
+		TrustedOperationStatus::Future
+			| TrustedOperationStatus::Ready
 			| TrustedOperationStatus::Broadcast
 	)
 }
