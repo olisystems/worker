@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # Creates a merkle-root of a set of orders and verifies the proof afterwards.
 #
