@@ -232,6 +232,7 @@ fn send_direct_request(
 							}
 							if connection_can_be_closed(status) {
 								direct_api.close().unwrap();
+								return None
 							}
 						},
 						_ => {
@@ -327,11 +328,13 @@ pub(crate) fn wait_until(
 }
 
 fn connection_can_be_closed(top_status: TrustedOperationStatus) -> bool {
+	// BestEnergy adjustment, as the offchain worker
+	// doesn't produce sidechain blocks, submitted is
+	// ok.
 	!matches!(
 		top_status,
-		TrustedOperationStatus::Submitted
-			| TrustedOperationStatus::Future
-			| TrustedOperationStatus::Ready
+		// TrustedOperationStatus::Submitted
+		|TrustedOperationStatus::Future| TrustedOperationStatus::Ready
 			| TrustedOperationStatus::Broadcast
 	)
 }
