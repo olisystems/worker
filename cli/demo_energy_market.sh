@@ -22,14 +22,8 @@
 # usage:
 #  demo_energy_market.sh -p <NODEPORT> -P <WORKERPORT> -t -O <path-to-order-file>
 
-while getopts ":m:p:P:t:u:V:C:O:" opt; do
+while getopts ":p:P:u:V:C:O:" opt; do
     case $opt in
-        t)
-            TEST=$OPTARG
-            ;;
-        m)
-            READMRENCLAVE=$OPTARG
-            ;;
         p)
             NPORT=$OPTARG
             ;;
