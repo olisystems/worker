@@ -91,9 +91,9 @@ echo "* Executing pay-as-pid market algorithm"
 RESULT=`$CLIENT trusted --mrenclave ${MRENCLAVE} --direct pay-as-bid //Alice ${ORDERS_STRING}`
 echo "Result: ${RESULT}"
 
-#echo "* Getting market results market algorithm"
-#MARKET_RESULT=`$CLIENT trusted --mrenclave ${MRENCLAVE} --direct get-market-results //Alice ${TIMESTAMP}`
-#echo "Proof: ${MARKET_RESULT}"
+echo "* Getting market results market algorithm"
+MARKET_RESULT=`$CLIENT trusted --mrenclave ${MRENCLAVE} --direct get-market-results //Alice ${TIMESTAMP}`
+echo "Proof: ${MARKET_RESULT}"
 
 echo "* Getting merkle proof for orders"
 PROOF=`$CLIENT trusted --mrenclave ${MRENCLAVE} --direct pay-as-bid-proof //Alice ${TIMESTAMP} ${ACTOR_ID}`
