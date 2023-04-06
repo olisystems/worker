@@ -23,10 +23,13 @@ set -euo pipefail
 # usage:
 #  demo_energy_market.sh -p <NODEPORT> -P <WORKERPORT> -t -O <path-to-order-file>
 
-while getopts ":p:P:u:V:C:A:O:T:" opt; do
+while getopts ":p:A:P:u:V:C:I:O:T:" opt; do
     case $opt in
         p)
             NPORT=$OPTARG
+            ;;
+        A)
+            WORKER1PORT=$OPTARG
             ;;
         P)
             WORKER1PORT=$OPTARG
@@ -40,7 +43,7 @@ while getopts ":p:P:u:V:C:A:O:T:" opt; do
         C)
             CLIENT_BIN=$OPTARG
             ;;
-        A)
+        I)
             ACTOR_ID=$OPTARG
             ;;
         O)
