@@ -21,6 +21,12 @@ pub fn get_merkle_proof_for_actor_from_file(
 
 pub fn read_market_results(timestamp: &str) -> Result<MarketOutput, StfError> {
 	let file = format!("{}/{}.json", RESULTS_DIR, timestamp);
+
+	log::info!("Files in {}", RESULTS_DIR);
+	while let Ok(file) = fs::read_dir(RESULTS_DIR) {
+		log::info!("{:?}", file);
+	}
+
 	let content = fs::read_to_string(file)
 		.map_err(|e| StfError::Dispatch(format!("Reading Results File Error: {:?}", e)))?;
 
