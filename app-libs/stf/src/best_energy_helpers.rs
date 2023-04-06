@@ -1,4 +1,4 @@
-use crate::{MerkleProofWithCodec, StfError};
+use crate::{MerkleProofWithCodec, StfError, String};
 use binary_merkle_tree::merkle_proof;
 use codec::Encode;
 use simplyr_lib::{MarketOutput, Order};
