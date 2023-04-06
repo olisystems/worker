@@ -101,6 +101,9 @@ COPY --from=builder /root/work/worker/bin/integritee-cli /usr/local/bin
 COPY --from=builder /root/work/worker/bin/orders /usr/local/worker-cli/orders
 COPY ./cli/*.sh /usr/local/worker-cli/
 
+RUN ls -alt /usr/local/worker-cli
+RUN ls -alt /usr/local/worker-cli/orders
+
 RUN chmod +x /usr/local/bin/integritee-cli ${SCRIPT_DIR}/*.sh
 RUN mkdir ${LOG_DIR}
 
