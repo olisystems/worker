@@ -12,7 +12,7 @@ services:
       integritee-worker-1:
         condition: service_healthy
     environment:
-      - RUST_LOG=warn,ws=warn,itc_rpc_client=warn
+      - RUST_LOG=warn,ws=warn,itc_rpc_client=warn,ita-stf=debug
       - FLAVOR_ID
     networks:
       - integritee-test-network
