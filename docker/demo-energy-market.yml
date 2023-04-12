@@ -12,7 +12,7 @@ services:
       integritee-worker-1:
         condition: service_healthy
     environment:
-      - RUST_LOG=warn,ws=warn,itc_rpc_client=warn,ita_stf=debug
+      - RUST_LOG=warn,ws=warn,itc_rpc_client=warn
     networks:
       - integritee-test-network
     entrypoint:
