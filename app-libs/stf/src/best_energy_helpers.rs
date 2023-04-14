@@ -31,8 +31,13 @@ pub fn read_market_results(timestamp: &str) -> Result<MarketOutput, StfError> {
 	let results_file = results_file(timestamp);
 
 	log::info!("Files in {}", RESULTS_DIR);
-	while let Ok(file) = fs::read_dir(RESULTS_DIR) {
-		log::info!("{:?}", file);
+	let entries = fs::read_dir(".")
+		.unwrap()
+		.map(|res| res.map(|e| e.path()).unwrap())
+		.collect::<Vec<_>>();
+
+	for entry in entries {
+		log::info!("{:?}", entry);
 	}
 
 	let content = fs::read_to_string(results_file)
