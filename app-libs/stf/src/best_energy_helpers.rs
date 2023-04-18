@@ -23,15 +23,9 @@ fn results_file(timestamp: &str) -> String {
 	format!("{}/{}.json", RESULTS_DIR, timestamp)
 }
 
-fn orders_file(timestamp: &str) -> String {
-	format!("{}/{}.json", ORDERS_DIR, timestamp)
-}
-
-pub fn read_market_results(timestamp: &str) -> Result<MarketOutput, StfError> {
-	let results_file = results_file(timestamp);
-
-	log::info!("Files in {}", RESULTS_DIR);
-	let entries = fs::read_dir(RESULTS_DIR)
+fn log_dir(dir: &str) {
+	log::info!("Files in {}", dir);
+	let entries = fs::read_dir(dir)
 		.unwrap()
 		.map(|res| res.map(|e| e.path()).unwrap())
 		.collect::<Vec<_>>();
@@ -39,6 +33,16 @@ pub fn read_market_results(timestamp: &str) -> Result<MarketOutput, StfError> {
 	for entry in entries {
 		log::info!("{:?}", entry);
 	}
+}
+
+fn orders_file(timestamp: &str) -> String {
+	format!("{}/{}.json", ORDERS_DIR, timestamp)
+}
+
+pub fn read_market_results(timestamp: &str) -> Result<MarketOutput, StfError> {
+	let results_file = results_file(timestamp);
+
+	log_dir(RESULTS_DIR);
 
 	let content = fs::read_to_string(results_file)
 		.map_err(|e| StfError::Dispatch(format!("Reading Results File Error: {:?}", e)))?;
@@ -49,6 +53,8 @@ pub fn read_market_results(timestamp: &str) -> Result<MarketOutput, StfError> {
 }
 
 pub fn read_orders(timestamp: &str) -> Result<Vec<Order>, StfError> {
+	log_dir(ORDERS_DIR);
+
 	let orders_file = orders_file(timestamp);
 	let content = fs::read_to_string(orders_file)
 		.map_err(|e| StfError::Dispatch(format!("Reading Orders File Error: {:?}", e)))?;
