@@ -72,7 +72,10 @@ pub fn write_orders(timestamp: &str, orders: &[Order]) -> Result<(), StfError> {
 	})?;
 
 	fs::write(&orders_file, orders_serialized)
-		.map_err(|e| StfError::Dispatch(format!("Writing orders {:?}. Error: {:?}", orders, e)))
+		.map_err(|e| StfError::Dispatch(format!("Writing orders {:?}. Error: {:?}", orders, e)))?;
+
+	log::info!("Wrote orders");
+	log_dir(ORDERS_DIR);
 }
 
 pub fn write_results(timestamp: &str, market_results: MarketOutput) -> Result<(), StfError> {
@@ -90,7 +93,10 @@ pub fn write_results(timestamp: &str, market_results: MarketOutput) -> Result<()
 			"Writing market results {:?}. Error: {:?}",
 			results_serialized, e
 		))
-	})
+	})?;
+
+	log::info!("Wrote results");
+	log_dir(RESULTS_DIR);
 }
 
 /// Gets the merkle proof of an `actor_id` if it is in the order set.
