@@ -76,6 +76,8 @@ pub fn write_orders(timestamp: &str, orders: &[Order]) -> Result<(), StfError> {
 
 	log::info!("Wrote orders");
 	log_dir(ORDERS_DIR);
+
+	Ok(())
 }
 
 pub fn write_results(timestamp: &str, market_results: MarketOutput) -> Result<(), StfError> {
@@ -97,6 +99,8 @@ pub fn write_results(timestamp: &str, market_results: MarketOutput) -> Result<()
 
 	log::info!("Wrote results");
 	log_dir(RESULTS_DIR);
+
+	Ok(())
 }
 
 /// Gets the merkle proof of an `actor_id` if it is in the order set.
