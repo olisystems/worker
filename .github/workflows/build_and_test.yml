@@ -35,8 +35,8 @@ jobs:
         include:
           - flavor_id: offchain-worker
             mode: offchain-worker
-            host: integritee-builder-sgx
-            sgx_mode: HW
+            host: ubuntu-latest
+            sgx_mode: SW
 
 
     steps:
@@ -169,8 +169,8 @@ jobs:
           - test: M6
             flavor_id: offchain-worker
             demo_name: demo-indirect-invocation
-            host: test-runner-sgx
-            sgx_mode: HW
+            host: ubuntu-latest
+            sgx_mode: SW
 
     steps:
       - uses: actions/checkout@v3
