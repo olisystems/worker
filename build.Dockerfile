@@ -59,9 +59,9 @@ WORKDIR $WORKHOME/worker
 
 COPY . .
 
-RUN --mount=type=cache,id=cargo-registry-cache,target=/opt/rust/registry/cache \
-	--mount=type=cache,id=cargo-registry-index,target=/opt/rust/registry/index \
-	--mount=type=cache,id=cargo-git,target=/opt/rust/git/db \
+RUN --mount=type=cache,id=cargo-registry-cache,target=/opt/rust/registry/cache,sharing=private \
+	--mount=type=cache,id=cargo-registry-index,target=/opt/rust/registry/index,sharing=private \
+	--mount=type=cache,id=cargo-git,target=/opt/rust/git/db,sharing=private \
 	echo ${FINGERPRINT} && make && make identity && cargo test --release
 
 ### Base Runner Stage
