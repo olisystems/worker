@@ -70,7 +70,7 @@ CLIENT_BIN=${CLIENT_BIN:-"./../bin/integritee-cli"}
 
 # Timestamp needs to match the one from the provided orders file.
 # Otherwise, you will get a results/proof not found error.
-TIMESTAMP=${TIMESTAMP:-"2022-03-04T05:06:07+00:00"}
+TIMESTAMP=${TIMESTAMP:-"2023-03-04T05:06:07+00:00"}
 ORDERS_FILE=${ORDERS_FILE:-"../bin/orders/order_10_users.json"}
 ACTOR_ID=${ACTOR_ID:-"actor_0"}
 
