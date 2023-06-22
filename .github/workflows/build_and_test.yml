@@ -241,6 +241,7 @@ jobs:
           docker compose -f <(envsubst < docker-compose.yml) -f <(envsubst < ${{ matrix.demo_name }}.yml) -p ${PROJECT} stop
 
       - name: Integration Test ${{ matrix.test }}-${{ matrix.flavor_id }}
+        timeout-minutes: 30
         run: |
           cd docker
           docker compose -f <(envsubst < docker-compose.yml) -f <(envsubst < ${{ matrix.demo_name }}.yml) -p ${PROJECT} up ${{ matrix.demo_name }} --no-build --exit-code-from ${{ matrix.demo_name }} --remove-orphans
