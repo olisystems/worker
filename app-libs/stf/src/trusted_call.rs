@@ -18,30 +18,39 @@
 #[cfg(feature = "evm")]
 use sp_core::{H160, H256, U256};
 
-#[cfg(feature = "evm")]
-use std::vec::Vec;
-
-use crate::{helpers::ensure_enclave_signer_account, StfError, TrustedOperation};
-use codec::{Decode, Encode};
+use crate::{
+	best_energy_helpers::storage::merkle_roots_map_key, helpers::ensure_enclave_signer_account,
+	StfError, TrustedOperation,
+};
+use binary_merkle_tree::merkle_root;
+use codec::{alloc::sync::Arc, Decode, Encode};
 use frame_support::{ensure, traits::UnfilteredDispatchable};
 pub use ita_sgx_runtime::{Balance, Index};
 use ita_sgx_runtime::{Runtime, System};
 use itp_node_api::metadata::{provider::AccessNodeMetadata, NodeMetadataTrait};
 use itp_node_api_metadata::pallet_enclave_bridge::EnclaveBridgeCallIndexes;
 use itp_stf_interface::ExecuteCall;
-use itp_stf_primitives::types::{AccountId, KeyPair, ShardIdentifier, Signature};
+use itp_stf_primitives::types::{AccountId, KeyPair, OrdersString, ShardIdentifier, Signature};
 use itp_types::OpaqueCall;
 use itp_utils::stringify::account_id_to_string;
 use log::*;
+use simplyr_lib::{pay_as_bid_matching, MarketInput, MarketOutput, Order};
 use sp_io::hashing::blake2_256;
-use sp_runtime::{traits::Verify, MultiAddress};
-use std::{format, prelude::v1::*, sync::Arc};
+use sp_runtime::{
+	traits::{Keccak256, Verify},
+	MultiAddress,
+};
+#[cfg(feature = "evm")]
+use std::vec::Vec;
+use std::{format, fs, prelude::v1::*, time::Instant};
 
 #[cfg(feature = "evm")]
 use ita_sgx_runtime::{AddressMapping, HashedAddressMapping};
 
 #[cfg(feature = "evm")]
 use crate::evm_helpers::{create_code_hash, evm_create2_address, evm_create_address};
+
+use crate::best_energy_helpers::{write_orders, write_results, ORDERS_DIR, RESULTS_DIR};
 
 #[derive(Encode, Decode, Clone, Debug, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
@@ -50,6 +59,7 @@ pub enum TrustedCall {
 	balance_transfer(AccountId, AccountId, Balance),
 	balance_unshield(AccountId, AccountId, Balance, ShardIdentifier), // (AccountIncognito, BeneficiaryPublicAccount, Amount, Shard)
 	balance_shield(AccountId, AccountId, Balance), // (Root, AccountIncognito, Amount)
+	pay_as_bid(AccountId, OrdersString),
 	#[cfg(feature = "evm")]
 	evm_withdraw(AccountId, H160, Balance), // (Origin, Address EVM Account, Value)
 	// (Origin, Source, Target, Input, Value, Gas limit, Max fee per gas, Max priority fee per gas, Nonce, Access list)
@@ -102,6 +112,7 @@ impl TrustedCall {
 			TrustedCall::balance_transfer(sender_account, ..) => sender_account,
 			TrustedCall::balance_unshield(sender_account, ..) => sender_account,
 			TrustedCall::balance_shield(sender_account, ..) => sender_account,
+			TrustedCall::pay_as_bid(sender_account, _orders_string) => sender_account,
 			#[cfg(feature = "evm")]
 			TrustedCall::evm_withdraw(sender_account, ..) => sender_account,
 			#[cfg(feature = "evm")]
@@ -265,6 +276,63 @@ where
 				)));
 				Ok(())
 			},
+
+			TrustedCall::pay_as_bid(_who, orders_string) => {
+				let now = Instant::now();
+
+				for dir in &[ORDERS_DIR, RESULTS_DIR] {
+					fs::create_dir_all(dir).map_err(|err| {
+						StfError::Dispatch(format!("Error creating directory {:?}: {:?}", dir, err))
+					})?;
+				}
+
+				let orders: Vec<Order> = serde_json::from_str(&orders_string).map_err(|err| {
+					StfError::Dispatch(format!("Error serializing to JSON: {}", err))
+				})?;
+
+				let market_input = MarketInput { orders: orders.clone() };
+				let orders_encoded: Vec<Vec<u8>> = orders.iter().map(|o| o.encode()).collect();
+
+				let timestamp = &orders[0].time_slot;
+
+				let orders_path = format!("{}/{}.json", ORDERS_DIR, timestamp);
+
+				if fs::metadata(&orders_path).is_ok() {
+					info!("Orders file already exists for timestamp {}", timestamp);
+					return Ok(())
+				}
+
+				let order_merkle_root = merkle_root::<Keccak256, _>(orders_encoded);
+				let pay_as_bid: MarketOutput = pay_as_bid_matching(&market_input);
+
+				write_orders(timestamp, &orders)?;
+
+				write_results(timestamp, pay_as_bid)?;
+
+				// store the merkle root associated with a given timestamp in the sgx state:
+				// to be defined.
+				// sp::io::set(storage_map_key());
+
+				sp_io::storage::set(
+					&merkle_roots_map_key(orders[0].time_slot.clone()),
+					&order_merkle_root.encode(),
+				);
+
+				let elapsed = now.elapsed();
+				info!("Time Elapsed for PayAsBid Algorithm is: {:.2?}", elapsed);
+
+				// Send proof of execution on chain.
+				// calls is in the scope from the outside
+				calls.push(OpaqueCall::from_tuple(&(
+					node_metadata_repo.get_from_metadata(|m| m.publish_hash_call_indexes())??,
+					order_merkle_root,
+					Vec::<itp_types::H256>::new(), // you can ignore this for now. Clients could subscribe to the hashes here to be notified when a new hash is published.
+					b"Published merkle root of an order!".to_vec(),
+				)));
+
+				Ok(())
+			},
+
 			#[cfg(feature = "evm")]
 			TrustedCall::evm_withdraw(from, address, value) => {
 				debug!("evm_withdraw({}, {}, {})", account_id_to_string(&from), address, value);
@@ -393,6 +461,7 @@ where
 			TrustedCall::balance_transfer(_, _, _) => debug!("No storage updates needed..."),
 			TrustedCall::balance_unshield(_, _, _, _) => debug!("No storage updates needed..."),
 			TrustedCall::balance_shield(_, _, _) => debug!("No storage updates needed..."),
+			TrustedCall::pay_as_bid(_, _) => debug!("No storage updates needed..."),
 			#[cfg(feature = "evm")]
 			_ => debug!("No storage updates needed..."),
 		};

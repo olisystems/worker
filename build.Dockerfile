@@ -18,6 +18,7 @@
 
 ### Cached Builder Stage
 ##################################################
+# For the OLI guys, we removed the sccache part is it makes the native GA runners run out of space.
 # A builder stage that uses sccache to speed up local builds with docker
 # Installation and setup of sccache should be moved to the integritee-dev image, so we don't
 # always need to compile and install sccache on CI (where we have no caching so far).
@@ -42,12 +43,12 @@ ENV SGX_PRODUCTION=$SGX_PRODUCTION
 ENV WORKHOME=/home/ubuntu/work
 ENV HOME=/home/ubuntu
 
-RUN rustup default stable
-RUN cargo install sccache --locked
+# RUN rustup default stable
+# RUN cargo install sccache --locked
 
-ENV SCCACHE_CACHE_SIZE="20G"
-ENV SCCACHE_DIR=$HOME/.cache/sccache
-ENV RUSTC_WRAPPER="/opt/rust/bin/sccache"
+# ENV SCCACHE_CACHE_SIZE="20G"
+# ENV SCCACHE_DIR=$HOME/.cache/sccache
+# ENV RUSTC_WRAPPER="/opt/rust/bin/sccache"
 
 ARG WORKER_MODE_ARG
 ARG ADDITIONAL_FEATURES_ARG
@@ -66,11 +67,10 @@ WORKDIR $WORKHOME/worker
 
 COPY . .
 
-RUN --mount=type=cache,id=cargo-registry-cache,target=/opt/rust/registry/cache,sharing=private \
-	--mount=type=cache,id=cargo-registry-index,target=/opt/rust/registry/index,sharing=private \
-	--mount=type=cache,id=cargo-git,target=/opt/rust/git/db,sharing=private \
-	--mount=type=cache,id=cargo-sccache-${WORKER_MODE}${ADDITIONAL_FEATURES},target=/home/ubuntu/.cache/sccache \
-	echo ${FINGERPRINT} && make && make identity && cargo test --release && sccache --show-stats
+RUN --mount=type=cache,id=cargo-registry-cache,target=/opt/rust/registry/cache \
+	--mount=type=cache,id=cargo-registry-index,target=/opt/rust/registry/index \
+	--mount=type=cache,id=cargo-git,target=/opt/rust/git/db \
+	echo ${FINGERPRINT} && make && make identity && cargo test --release
 
 ### Base Runner Stage
 ### The runner needs the aesmd service for the `SGX_MODE=HW`.

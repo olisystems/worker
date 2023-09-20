@@ -1,35 +1,48 @@
 /*
 	Copyright 2021 Integritee AG and Supercomputing Systems AG
-
 	Licensed under the Apache License, Version 2.0 (the "License");
 	you may not use this file except in compliance with the License.
 	You may obtain a copy of the License at
-
 		http://www.apache.org/licenses/LICENSE-2.0
-
 	Unless required by applicable law or agreed to in writing, software
 	distributed under the License is distributed on an "AS IS" BASIS,
 	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 	See the License for the specific language governing permissions and
 	limitations under the License.
-
 */
 
 use crate::{
-	trusted_base_cli::commands::{
-		balance::BalanceCommand, nonce::NonceCommand, set_balance::SetBalanceCommand,
-		transfer::TransferCommand, unshield_funds::UnshieldFundsCommand,
-	},
-	trusted_cli::TrustedCli,
-	trusted_command_utils::get_keystore_path,
-	Cli, CliResult, CliResultOk, ED25519_KEY_TYPE, SR25519_KEY_TYPE,
+	trusted_cli::TrustedCli, trusted_command_utils::get_keystore_path, Cli, CliResult, CliResultOk,
+	ED25519_KEY_TYPE, SR25519_KEY_TYPE,
 };
 use log::*;
 use sp_core::crypto::Ss58Codec;
 use sp_keystore::Keystore;
 use substrate_client_keystore::LocalKeystore;
 
+// private modules defining commands.
 mod commands;
+
+// Public module re-exporting the commands.
+pub mod cmds {
+	pub use super::commands::{
+		balance::BalanceCommand, nonce::NonceCommand, set_balance::SetBalanceCommand,
+		transfer::TransferCommand, unshield_funds::UnshieldFundsCommand,
+	};
+}
+
+// Commands for the BEST-energy worker.
+// For upstream merges it is always better to have a clear separate between local code and upstream
+// code.
+pub mod oli_cmds {
+	pub use super::commands::{
+		get_market_results::GetMarketResultsCommand, pay_as_bid::PayAsBidCommand,
+		pay_as_bid_proof::PayAsBidProofCommand, verify_proof::VerifyMerkleProofCommand,
+	};
+}
+
+use cmds::*;
+use oli_cmds::*;
 
 #[derive(Subcommand)]
 pub enum TrustedBaseCommand {
@@ -51,9 +64,20 @@ pub enum TrustedBaseCommand {
 	/// Transfer funds from an incognito account to an parentchain account
 	UnshieldFunds(UnshieldFundsCommand),
 
-	/// gets the nonce of a given account, taking the pending trusted calls
-	/// in top pool in consideration
+	/// Gets the layer two nonce.
 	Nonce(NonceCommand),
+
+	/// PayAsBid Command
+	PayAsBid(PayAsBidCommand),
+
+	/// PayAsBidProof Command
+	PayAsBidProof(PayAsBidProofCommand),
+
+	/// VerifyProof Command
+	VerifyProof(VerifyMerkleProofCommand),
+
+	/// Get Market Results Command
+	GetMarketResults(GetMarketResultsCommand),
 }
 
 impl TrustedBaseCommand {
@@ -66,6 +90,10 @@ impl TrustedBaseCommand {
 			TrustedBaseCommand::Balance(cmd) => cmd.run(cli, trusted_cli),
 			TrustedBaseCommand::UnshieldFunds(cmd) => cmd.run(cli, trusted_cli),
 			TrustedBaseCommand::Nonce(cmd) => cmd.run(cli, trusted_cli),
+			TrustedBaseCommand::PayAsBid(cmd) => cmd.run(cli, trusted_cli),
+			TrustedBaseCommand::PayAsBidProof(cmd) => cmd.run(cli, trusted_cli),
+			TrustedBaseCommand::VerifyProof(cmd) => cmd.run(cli, trusted_cli),
+			TrustedBaseCommand::GetMarketResults(cmd) => cmd.run(cli, trusted_cli),
 		}
 	}
 }

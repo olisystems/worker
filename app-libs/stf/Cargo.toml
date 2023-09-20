@@ -10,6 +10,8 @@ codec = { version = "3.0.0", default-features = false, features = ["derive"], pa
 derive_more = { version = "0.99.5" }
 log = { version = "0.4", default-features = false }
 rlp = { version = "0.5", default-features = false }
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "1.0.87", default-features = false }
 sha3 = { version = "0.10", default-features = false }
 
 # sgx deps
@@ -42,6 +44,9 @@ sp-runtime = { default-features = false, git = "https://github.com/paritytech/su
 my-node-runtime = { package = "integritee-node-runtime", optional = true, git = "https://github.com/integritee-network/integritee-node.git", branch = "sdk-v0.12.0-polkadot-v0.9.42" }
 pallet-parentchain = { default-features = false, git = "https://github.com/integritee-network/pallets.git", branch = "sdk-v0.12.0-polkadot-v0.9.42" }
 
+# simplyR
+binary-merkle-tree = { default-features = false, git = "https://github.com/paritytech/substrate.git" }
+simplyr-lib = { default-features = false, git = "https://github.com/BESTenergytrade/simplyr-lib.git", branch = "cI/usize" }
 
 [dev-dependencies]
 sp-keyring = { git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.42" }

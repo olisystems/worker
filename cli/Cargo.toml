@@ -59,6 +59,10 @@ itp-time-utils = { path = "../core-primitives/time-utils" }
 itp-types = { path = "../core-primitives/types" }
 itp-utils = { path = "../core-primitives/utils" }
 
+# Simplyr
+binary-merkle-tree = { default-features = false, git = "https://github.com/paritytech/substrate.git" }
+simplyr-lib = { default-features = false, git = "https://github.com/BESTenergytrade/simplyr-lib.git", branch = "cI/usize" }
+
 [features]
 default = []
 evm = ["ita-stf/evm_std", "pallet-evm"]
