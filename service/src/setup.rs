@@ -17,23 +17,24 @@
 */
 
 use crate::error::{Error, ServiceResult};
+use base58::ToBase58;
 use codec::Encode;
 use itp_enclave_api::{enclave_base::EnclaveBase, Enclave};
 use itp_settings::files::{
-	LAST_SLOT_BIN, LIGHT_CLIENT_DB, SHARDS_PATH, SHIELDING_KEY_FILE, SIDECHAIN_STORAGE_PATH,
-	SIGNING_KEY_FILE,
+	INTEGRITEE_PARENTCHAIN_LIGHT_CLIENT_DB_PATH, SHARDS_PATH, SHIELDING_KEY_FILE,
+	SIDECHAIN_STORAGE_PATH, SIGNING_KEY_FILE, TARGET_A_PARENTCHAIN_LIGHT_CLIENT_DB_PATH,
+	TARGET_B_PARENTCHAIN_LIGHT_CLIENT_DB_PATH,
 };
 use itp_types::ShardIdentifier;
 use log::*;
 use std::{fs, fs::File, path::Path};
 
-/// Purge all worker files from the current working directory (cwd).
-pub(crate) fn purge_files_from_cwd() -> ServiceResult<()> {
-	let current_directory = std::env::current_dir().map_err(|e| Error::Custom(e.into()))?;
+/// Purge all worker files from `dir`.
+pub(crate) fn purge_files_from_dir(dir: &Path) -> ServiceResult<()> {
 	println!("[+] Performing a clean reset of the worker");
 
 	println!("[+] Purge all files from previous runs");
-	purge_files(&current_directory)?;
+	purge_files(dir)?;
 
 	Ok(())
 }
@@ -56,10 +57,10 @@ pub(crate) fn initialize_shard_and_keys(
 pub(crate) fn init_shard(enclave: &Enclave, shard_identifier: &ShardIdentifier) {
 	match enclave.init_shard(shard_identifier.encode()) {
 		Err(e) => {
-			println!("Failed to initialize shard {:?}: {:?}", shard_identifier, e);
+			println!("Failed to initialize shard {:?}: {:?}", shard_identifier.0.to_base58(), e);
 		},
 		Ok(_) => {
-			println!("Successfully initialized shard {:?}", shard_identifier);
+			println!("Successfully initialized shard {:?}", shard_identifier.0.to_base58());
 		},
 	}
 }
@@ -97,9 +98,9 @@ fn purge_files(root_directory: &Path) -> ServiceResult<()> {
 	remove_dir_if_it_exists(root_directory, SHARDS_PATH)?;
 	remove_dir_if_it_exists(root_directory, SIDECHAIN_STORAGE_PATH)?;
 
-	remove_file_if_it_exists(root_directory, LAST_SLOT_BIN)?;
-	remove_file_if_it_exists(root_directory, LIGHT_CLIENT_DB)?;
-	remove_file_if_it_exists(root_directory, light_client_backup_file().as_str())?;
+	remove_dir_if_it_exists(root_directory, INTEGRITEE_PARENTCHAIN_LIGHT_CLIENT_DB_PATH)?;
+	remove_dir_if_it_exists(root_directory, TARGET_A_PARENTCHAIN_LIGHT_CLIENT_DB_PATH)?;
+	remove_dir_if_it_exists(root_directory, TARGET_B_PARENTCHAIN_LIGHT_CLIENT_DB_PATH)?;
 
 	Ok(())
 }
@@ -112,22 +113,10 @@ fn remove_dir_if_it_exists(root_directory: &Path, dir_name: &str) -> ServiceResu
 	Ok(())
 }
 
-fn remove_file_if_it_exists(root_directory: &Path, file_name: &str) -> ServiceResult<()> {
-	let file = root_directory.join(file_name);
-	if file.exists() {
-		fs::remove_file(file).map_err(|e| Error::Custom(e.into()))?;
-	}
-	Ok(())
-}
-
-fn light_client_backup_file() -> String {
-	format!("{}.1", LIGHT_CLIENT_DB)
-}
-
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use itp_settings::files::SHARDS_PATH;
+	use itp_settings::files::{SHARDS_PATH, TARGET_A_PARENTCHAIN_LIGHT_CLIENT_DB_PATH};
 	use std::{fs, path::PathBuf};
 
 	#[test]
@@ -147,17 +136,20 @@ mod tests {
 		fs::File::create(&sidechain_db_path.join("sidechain_db_2.bin")).unwrap();
 		fs::File::create(&sidechain_db_path.join("sidechain_db_3.bin")).unwrap();
 
-		fs::File::create(&root_directory.join(LAST_SLOT_BIN)).unwrap();
-		fs::File::create(&root_directory.join(LIGHT_CLIENT_DB)).unwrap();
-		fs::File::create(&root_directory.join(light_client_backup_file())).unwrap();
+		fs::create_dir_all(&root_directory.join(INTEGRITEE_PARENTCHAIN_LIGHT_CLIENT_DB_PATH))
+			.unwrap();
+		fs::create_dir_all(&root_directory.join(TARGET_A_PARENTCHAIN_LIGHT_CLIENT_DB_PATH))
+			.unwrap();
+		fs::create_dir_all(&root_directory.join(TARGET_B_PARENTCHAIN_LIGHT_CLIENT_DB_PATH))
+			.unwrap();
 
 		purge_files(&root_directory).unwrap();
 
 		assert!(!shards_path.exists());
 		assert!(!sidechain_db_path.exists());
-		assert!(!root_directory.join(LAST_SLOT_BIN).exists());
-		assert!(!root_directory.join(LIGHT_CLIENT_DB).exists());
-		assert!(!root_directory.join(light_client_backup_file()).exists());
+		assert!(!root_directory.join(INTEGRITEE_PARENTCHAIN_LIGHT_CLIENT_DB_PATH).exists());
+		assert!(!root_directory.join(TARGET_A_PARENTCHAIN_LIGHT_CLIENT_DB_PATH).exists());
+		assert!(!root_directory.join(TARGET_B_PARENTCHAIN_LIGHT_CLIENT_DB_PATH).exists());
 	}
 
 	#[test]

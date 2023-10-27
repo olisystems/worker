@@ -16,65 +16,94 @@
 */
 
 use crate::ApiResult;
-use itp_types::{Enclave, IpfsHash, ShardIdentifier};
-use sp_core::{Pair, H256 as Hash};
-use sp_runtime::MultiSignature;
-use substrate_api_client::{Api, ExtrinsicParams, RpcClient};
+use itp_api_client_types::{traits::GetStorage, Api, Config, Request};
+use itp_types::{AccountId, IpfsHash, MultiEnclave, ShardIdentifier, ShardStatus};
+use log::error;
 
 pub const TEEREX: &str = "Teerex";
-pub const SIDECHAIN: &str = "Sidechain";
+pub const ENCLAVE_BRIDGE: &str = "EnclaveBridge";
 
 /// ApiClient extension that enables communication with the `teerex` pallet.
+// Todo: make generic over `Config` type instead?
 pub trait PalletTeerexApi {
-	fn enclave(&self, index: u64, at_block: Option<Hash>) -> ApiResult<Option<Enclave>>;
-	fn enclave_count(&self, at_block: Option<Hash>) -> ApiResult<u64>;
-	fn all_enclaves(&self, at_block: Option<Hash>) -> ApiResult<Vec<Enclave>>;
-	fn worker_for_shard(
+	type Hash;
+
+	fn enclave(
+		&self,
+		account: &AccountId,
+		at_block: Option<Self::Hash>,
+	) -> ApiResult<Option<MultiEnclave<Vec<u8>>>>;
+	fn enclave_count(&self, at_block: Option<Self::Hash>) -> ApiResult<u64>;
+	fn all_enclaves(&self, at_block: Option<Self::Hash>) -> ApiResult<Vec<MultiEnclave<Vec<u8>>>>;
+	fn primary_worker_for_shard(
 		&self,
 		shard: &ShardIdentifier,
-		at_block: Option<Hash>,
-	) -> ApiResult<Option<Enclave>>;
+		at_block: Option<Self::Hash>,
+	) -> ApiResult<Option<MultiEnclave<Vec<u8>>>>;
 	fn latest_ipfs_hash(
 		&self,
 		shard: &ShardIdentifier,
-		at_block: Option<Hash>,
+		at_block: Option<Self::Hash>,
 	) -> ApiResult<Option<IpfsHash>>;
 }
 
-impl<P: Pair, Client: RpcClient, Params: ExtrinsicParams> PalletTeerexApi for Api<P, Client, Params>
+impl<RuntimeConfig, Client> PalletTeerexApi for Api<RuntimeConfig, Client>
 where
-	MultiSignature: From<P::Signature>,
+	RuntimeConfig: Config,
+	Client: Request,
 {
-	fn enclave(&self, index: u64, at_block: Option<Hash>) -> ApiResult<Option<Enclave>> {
-		self.get_storage_map(TEEREX, "EnclaveRegistry", index, at_block)
+	type Hash = RuntimeConfig::Hash;
+
+	fn enclave(
+		&self,
+		account: &AccountId,
+		at_block: Option<Self::Hash>,
+	) -> ApiResult<Option<MultiEnclave<Vec<u8>>>> {
+		self.get_storage_map(TEEREX, "SovereignEnclaves", account, at_block)
 	}
 
-	fn enclave_count(&self, at_block: Option<Hash>) -> ApiResult<u64> {
-		Ok(self.get_storage_value(TEEREX, "EnclaveCount", at_block)?.unwrap_or(0u64))
+	fn enclave_count(&self, at_block: Option<Self::Hash>) -> ApiResult<u64> {
+		Ok(self.all_enclaves(at_block)?.len() as u64)
 	}
 
-	fn all_enclaves(&self, at_block: Option<Hash>) -> ApiResult<Vec<Enclave>> {
-		let count = self.enclave_count(at_block)?;
-		let mut enclaves = Vec::with_capacity(count as usize);
-		for n in 1..=count {
-			enclaves.push(self.enclave(n, at_block)?.expect("None enclave"))
+	fn all_enclaves(&self, at_block: Option<Self::Hash>) -> ApiResult<Vec<MultiEnclave<Vec<u8>>>> {
+		let key_prefix = self.get_storage_map_key_prefix("Teerex", "SovereignEnclaves")?;
+		//fixme: solve this properly with infinite elements
+		let max_keys = 1000;
+		let storage_keys =
+			self.get_storage_keys_paged(Some(key_prefix), max_keys, None, at_block)?;
+
+		if storage_keys.len() == max_keys as usize {
+			error!("results can be wrong because max keys reached for query")
 		}
+		let enclaves = storage_keys
+			.into_iter()
+			.filter_map(|key| self.get_storage_by_key(key, at_block).ok()?)
+			.collect();
 		Ok(enclaves)
 	}
 
-	fn worker_for_shard(
+	fn primary_worker_for_shard(
 		&self,
 		shard: &ShardIdentifier,
-		at_block: Option<Hash>,
-	) -> ApiResult<Option<Enclave>> {
-		self.get_storage_map(SIDECHAIN, "WorkerForShard", shard, at_block)?
-			.map_or_else(|| Ok(None), |w_index| self.enclave(w_index, at_block))
+		at_block: Option<Self::Hash>,
+	) -> ApiResult<Option<MultiEnclave<Vec<u8>>>> {
+		self.get_storage_map(ENCLAVE_BRIDGE, "ShardStatus", shard, at_block)?
+			.map_or_else(
+				|| Ok(None),
+				|statuses: ShardStatus| {
+					statuses.get(0).map_or_else(
+						|| Ok(None),
+						|signerstatus| self.enclave(&signerstatus.signer, at_block),
+					)
+				},
+			)
 	}
 
 	fn latest_ipfs_hash(
 		&self,
 		shard: &ShardIdentifier,
-		at_block: Option<Hash>,
+		at_block: Option<Self::Hash>,
 	) -> ApiResult<Option<IpfsHash>> {
 		self.get_storage_map(TEEREX, "LatestIPFSHash", shard, at_block)
 	}

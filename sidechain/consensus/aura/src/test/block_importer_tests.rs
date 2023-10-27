@@ -15,14 +15,11 @@
 
 */
 
-use crate::{block_importer::BlockImporter, test::fixtures::validateer, ShardIdentifierFor};
+use crate::{block_importer::BlockImporter, ShardIdentifierFor};
 use codec::Encode;
 use core::assert_matches::assert_matches;
 use itc_parentchain_block_import_dispatcher::trigger_parentchain_block_import_mock::TriggerParentchainBlockImportMock;
-use itc_parentchain_test::{
-	parentchain_block_builder::ParentchainBlockBuilder,
-	parentchain_header_builder::ParentchainHeaderBuilder,
-};
+use itc_parentchain_test::{ParentchainBlockBuilder, ParentchainHeaderBuilder};
 use itp_sgx_crypto::{aes::Aes, mocks::KeyRepositoryMock, StateCrypto};
 use itp_sgx_externalities::SgxExternalitiesDiffType;
 use itp_stf_state_handler::handle_state::HandleState;
@@ -37,7 +34,7 @@ use its_primitives::{
 };
 use its_state::StateUpdate;
 use its_test::{
-	sidechain_block_builder::SidechainBlockBuilder,
+	sidechain_block_builder::{SidechainBlockBuilder, SidechainBlockBuilderTrait},
 	sidechain_block_data_builder::SidechainBlockDataBuilder,
 	sidechain_header_builder::SidechainHeaderBuilder,
 };
@@ -81,7 +78,8 @@ fn test_fixtures(
 	let top_pool_author = Arc::new(TestTopPoolAuthor::default());
 	let ocall_api = Arc::new(OnchainMock::default().add_validateer_set(
 		parentchain_header,
-		Some(vec![validateer(Keyring::Alice.public().into())]),
+		shard(),
+		Some(vec![Keyring::Alice.public().into()]),
 	));
 	let state_key_repository = Arc::new(TestStateKeyRepo::new(state_key()));
 

@@ -16,26 +16,34 @@
 */
 
 use crate::ApiResult;
-use itp_types::AccountId;
-use sp_core::crypto::Pair;
-use sp_runtime::MultiSignature;
-use substrate_api_client::{Api, ExtrinsicParams, RpcClient};
+use itp_api_client_types::{
+	traits::GetAccountInformation, Api, Config, ParentchainRuntimeConfig, Request,
+};
 
 /// ApiClient extension that contains some convenience methods around accounts.
+// Todo: make generic over `Config` type instead?
 pub trait AccountApi {
-	fn get_nonce_of(&self, who: &AccountId) -> ApiResult<u32>;
-	fn get_free_balance(&self, who: &AccountId) -> ApiResult<u128>;
+	type AccountId;
+	type Index;
+	type Balance;
+
+	fn get_nonce_of(&self, who: &Self::AccountId) -> ApiResult<Self::Index>;
+	fn get_free_balance(&self, who: &Self::AccountId) -> ApiResult<Self::Balance>;
 }
 
-impl<P: Pair, Client: RpcClient, Params: ExtrinsicParams> AccountApi for Api<P, Client, Params>
+impl<Client> AccountApi for Api<ParentchainRuntimeConfig, Client>
 where
-	MultiSignature: From<P::Signature>,
+	Client: Request,
 {
-	fn get_nonce_of(&self, who: &AccountId) -> ApiResult<u32> {
-		Ok(self.get_account_info(who)?.map_or_else(|| 0, |info| info.nonce))
+	type AccountId = <ParentchainRuntimeConfig as Config>::AccountId;
+	type Index = <ParentchainRuntimeConfig as Config>::Index;
+	type Balance = <ParentchainRuntimeConfig as Config>::Balance;
+
+	fn get_nonce_of(&self, who: &Self::AccountId) -> ApiResult<Self::Index> {
+		Ok(self.get_account_info(who)?.map(|info| info.nonce).unwrap_or_default())
 	}
 
-	fn get_free_balance(&self, who: &AccountId) -> ApiResult<u128> {
-		Ok(self.get_account_data(who)?.map_or_else(|| 0, |data| data.free))
+	fn get_free_balance(&self, who: &Self::AccountId) -> ApiResult<Self::Balance> {
+		Ok(self.get_account_data(who)?.map(|data| data.free).unwrap_or_default())
 	}
 }

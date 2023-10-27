@@ -20,7 +20,7 @@ use crate::{
 	trusted_cli::TrustedCli,
 	trusted_command_utils::{get_identifiers, get_pair_from_str},
 	trusted_operation::perform_trusted_operation,
-	Cli,
+	Cli, CliError, CliResult, CliResultOk,
 };
 use codec::Decode;
 use ita_stf::{Index, TrustedCall, TrustedGetter, TrustedOperation};
@@ -31,17 +31,29 @@ use sp_core::Pair;
 #[derive(Parser)]
 pub struct PayAsBidCommand {
 	/// AccountId in ss58check format
-	account: String,
-	orders_string: String,
+	pub account: String,
+	pub orders_string: String,
 }
 
 impl PayAsBidCommand {
-	pub(crate) fn run(&self, cli: &Cli, trusted_args: &TrustedCli) {
-		println!("Result: {:?}", pay_as_bid(cli, trusted_args, &self.account, &self.orders_string));
+	pub(crate) fn run(&self, cli: &Cli, trusted_args: &TrustedCli) -> CliResult {
+		let results = pay_as_bid(cli, trusted_args, &self.account, &self.orders_string);
+		match results {
+			Ok(res) => Ok(CliResultOk::PayAsBidOutput(res)),
+			Err(e) => {
+				log::error!("Error: {}", e);
+				Err(CliError::TrustedOp { msg: "Error savings Orders".into() })
+			},
+		}
 	}
 }
 
-pub(crate) fn pay_as_bid(cli: &Cli, trusted_args: &TrustedCli, arg_who: &str, orders_string: &str) {
+pub(crate) fn pay_as_bid(
+	cli: &Cli,
+	trusted_args: &TrustedCli,
+	arg_who: &str,
+	orders_string: &str,
+) -> Result<Option<Vec<u8>>, CliError> {
 	debug!("arg_who = {:?}", arg_who);
 	let who = get_pair_from_str(trusted_args, arg_who);
 	let signer = get_pair_from_str(trusted_args, arg_who);
@@ -52,5 +64,15 @@ pub(crate) fn pay_as_bid(cli: &Cli, trusted_args: &TrustedCli, arg_who: &str, or
 			.sign(&KeyPair::Sr25519(Box::new(signer)), nonce, &mrenclave, &shard)
 			.into_trusted_operation(trusted_args.direct);
 
-	let _res = perform_trusted_operation(cli, trusted_args, &top);
+	let res = perform_trusted_operation(cli, trusted_args, &top);
+	match res {
+		Ok(opt) => match opt {
+			Some(_results) => Ok(Some(_results)),
+			None => Ok(None),
+		},
+		Err(err) => {
+			log::error!("Error in saving Orders: {}", err);
+			Err(CliError::TrustedOp { msg: format!("Error in saving Orders: {}", err) })
+		},
+	}
 }

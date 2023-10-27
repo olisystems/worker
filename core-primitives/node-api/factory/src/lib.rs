@@ -16,7 +16,7 @@
 
 */
 
-use itp_api_client_types::{ParentchainApi, WsRpcClient};
+use itp_api_client_types::{ParentchainApi, TungsteniteRpcClient};
 use sp_core::sr25519;
 
 /// Trait to create a node API, based on a node URL and signer.
@@ -27,10 +27,24 @@ pub trait CreateNodeApi {
 /// Node API factory error.
 #[derive(Debug, thiserror::Error)]
 pub enum NodeApiFactoryError {
-	#[error("Failed to create a node API: {0}")]
-	FailedToCreateNodeApi(#[from] itp_api_client_types::ApiClientError),
+	#[error("Could not connect to node with rpc client")]
+	FailedToCreateRpcClient(itp_api_client_types::RpcClientError),
+	#[error("Failed to create a node API")]
+	FailedToCreateNodeApi(itp_api_client_types::ApiClientError),
 	#[error(transparent)]
 	Other(#[from] Box<dyn std::error::Error + Sync + Send + 'static>),
+}
+
+impl From<itp_api_client_types::RpcClientError> for NodeApiFactoryError {
+	fn from(error: itp_api_client_types::RpcClientError) -> Self {
+		NodeApiFactoryError::FailedToCreateRpcClient(error)
+	}
+}
+
+impl From<itp_api_client_types::ApiClientError> for NodeApiFactoryError {
+	fn from(error: itp_api_client_types::ApiClientError) -> Self {
+		NodeApiFactoryError::FailedToCreateNodeApi(error)
+	}
 }
 
 pub type Result<T> = std::result::Result<T, NodeApiFactoryError>;
@@ -49,8 +63,11 @@ impl NodeApiFactory {
 
 impl CreateNodeApi for NodeApiFactory {
 	fn create_api(&self) -> Result<ParentchainApi> {
-		ParentchainApi::new(WsRpcClient::new(self.node_url.as_str()))
-			.map_err(NodeApiFactoryError::FailedToCreateNodeApi)
-			.map(|a| a.set_signer(self.signer.clone()))
+		let rpc_client = TungsteniteRpcClient::new(self.node_url.as_str(), 5)
+			.map_err(NodeApiFactoryError::FailedToCreateRpcClient)?;
+		let mut api =
+			ParentchainApi::new(rpc_client).map_err(NodeApiFactoryError::FailedToCreateNodeApi)?;
+		api.set_signer(self.signer.clone().into());
+		Ok(api)
 	}
 }

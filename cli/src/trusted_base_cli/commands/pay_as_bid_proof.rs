@@ -13,7 +13,7 @@
 
 use crate::{
 	trusted_cli::TrustedCli, trusted_command_utils::get_pair_from_str,
-	trusted_operation::perform_trusted_operation, Cli,
+	trusted_operation::perform_trusted_operation, Cli, CliResult, CliResultOk,
 };
 
 use codec::Decode;
@@ -22,31 +22,35 @@ use itp_stf_primitives::types::KeyPair;
 use log::debug;
 use sp_core::{Pair, H256};
 
+use crate::CliError;
 use codec;
-
 #[derive(Parser)]
 pub struct PayAsBidProofCommand {
 	/// AccountId in ss58check format
-	account: String,
-	timestamp: String,
-	actor_id: String,
+	pub account: String,
+	pub timestamp: String,
+	pub actor_id: String,
 }
 
 impl PayAsBidProofCommand {
-	pub(crate) fn run(&self, cli: &Cli, trusted_args: &TrustedCli) {
-		println!(
-			"{:?}",
-			// if we serialize with serde-json we can easily just pass it as
-			// an argument in the verify-proof command.
-			serde_json::to_string(&pay_as_bid_proof(
-				cli,
-				trusted_args,
-				&self.account,
-				self.timestamp.clone(),
-				self.actor_id.clone()
-			))
-			.unwrap()
+	pub(crate) fn run(&self, cli: &Cli, trusted_args: &TrustedCli) -> CliResult {
+		// if we serialize with serde-json we can easily just pass it as
+		// an argument in the verify-proof command.
+		let results = pay_as_bid_proof(
+			cli,
+			trusted_args,
+			&self.account,
+			self.timestamp.clone(),
+			self.actor_id.clone(),
 		);
+
+		match results {
+			Ok(res) => Ok(CliResultOk::PayAsBidProofOutput(res)),
+			Err(e) => {
+				log::error!("Error getting proof: {}", e);
+				Err(CliError::TrustedOp { msg: "Error getting proof".into() })
+			},
+		}
 	}
 }
 
@@ -56,7 +60,7 @@ pub(crate) fn pay_as_bid_proof(
 	arg_who: &str,
 	timestamp: String,
 	actor_id: String,
-) -> MerkleProofWithCodec<H256, Vec<u8>> {
+) -> Result<MerkleProofWithCodec<H256, Vec<u8>>, CliError> {
 	debug!("arg_who = {:?}", arg_who);
 	let who = get_pair_from_str(trusted_args, arg_who);
 
@@ -65,16 +69,21 @@ pub(crate) fn pay_as_bid_proof(
 			.sign(&KeyPair::Sr25519(Box::new(who)))
 			.into();
 
-	let res = perform_trusted_operation(cli, trusted_args, &top);
+	let res = perform_trusted_operation(cli, trusted_args, &top).unwrap();
 
 	match res {
-		Some(value) => {
-			let proof: MerkleProofWithCodec<_, _> =
-				MerkleProofWithCodec::decode(&mut &value[..]).unwrap();
-			proof
+		Some(_proof) => match MerkleProofWithCodec::decode(&mut &_proof[..]) {
+			Ok(_proof) => Ok(_proof),
+			Err(err) => {
+				log::error!("Error deserializing results: {}", err);
+				Err(CliError::TrustedOp {
+					msg: format!("Error deserializing market results: {}", err),
+				})
+			},
 		},
 		None => {
-			panic!("Proof not found");
+			log::error!("Results not found");
+			Err(CliError::TrustedOp { msg: "Results not found".into() })
 		},
 	}
 }

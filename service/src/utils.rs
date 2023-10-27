@@ -19,11 +19,10 @@
 use base58::{FromBase58, ToBase58};
 use itp_enclave_api::enclave_base::EnclaveBase;
 use itp_types::ShardIdentifier;
-use log::{debug, info};
-use std::path::Path;
+use log::info;
 
 pub fn extract_shard<E: EnclaveBase>(
-	maybe_shard_str: &Option<String>,
+	maybe_shard_str: Option<&str>,
 	enclave_api: &E,
 ) -> ShardIdentifier {
 	match maybe_shard_str {
@@ -34,15 +33,18 @@ pub fn extract_shard<E: EnclaveBase>(
 			shard.into()
 		},
 		_ => {
-			let mrenclave = enclave_api.get_mrenclave().unwrap();
-			info!("no shard specified. using mrenclave as id: {}", mrenclave.to_base58());
+			let mrenclave = enclave_api.get_fingerprint().unwrap();
+			info!("no shard specified. using mrenclave as id: {}", mrenclave.0.to_base58());
 			ShardIdentifier::from_slice(&mrenclave[..])
 		},
 	}
 }
 
+#[cfg(not(feature = "dcap"))]
 pub fn check_files() {
 	use itp_settings::files::{ENCLAVE_FILE, RA_API_KEY_FILE, RA_SPID_FILE};
+	use log::debug;
+	use std::path::Path;
 	debug!("*** Check files");
 	let files = [ENCLAVE_FILE, RA_SPID_FILE, RA_API_KEY_FILE];
 	for f in files.iter() {

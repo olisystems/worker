@@ -15,13 +15,12 @@
 
 */
 
-use crate::{command_utils::get_chain_api, Cli};
+use crate::{command_utils::get_chain_api, Cli, CliResult, CliResultOk};
 use base58::ToBase58;
-use codec::{Decode, Encode};
+use codec::Encode;
 use log::*;
 use my_node_runtime::{Hash, RuntimeEvent};
-use std::{sync::mpsc::channel, vec::Vec};
-use substrate_api_client::utils::FromHexString;
+use substrate_api_client::SubscribeEvents;
 
 #[derive(Parser)]
 pub struct ListenCommand {
@@ -35,32 +34,28 @@ pub struct ListenCommand {
 }
 
 impl ListenCommand {
-	pub(crate) fn run(&self, cli: &Cli) {
+	pub(crate) fn run(&self, cli: &Cli) -> CliResult {
 		println!("{:?} {:?}", self.events, self.blocks);
 		let api = get_chain_api(cli);
 		info!("Subscribing to events");
-		let (events_in, events_out) = channel();
 		let mut count = 0u32;
 		let mut blocks = 0u32;
-		api.subscribe_events(events_in).unwrap();
+		let mut subscription = api.subscribe_events().unwrap();
 		loop {
 			if let Some(e) = self.events {
 				if count >= e {
-					return
+					return Ok(CliResultOk::None)
 				}
 			};
 			if let Some(b) = self.blocks {
 				if blocks >= b {
-					return
+					return Ok(CliResultOk::None)
 				}
 			};
-			let event_str = events_out.recv().unwrap();
-			let _unhex = Vec::from_hex(event_str).unwrap();
-			let mut _er_enc = _unhex.as_slice();
-			let _events =
-				Vec::<frame_system::EventRecord<RuntimeEvent, Hash>>::decode(&mut _er_enc);
+
+			let event_results = subscription.next_events::<RuntimeEvent, Hash>().unwrap();
 			blocks += 1;
-			match _events {
+			match event_results {
 				Ok(evts) =>
 					for evr in &evts {
 						println!("decoded: phase {:?} event {:?}", evr.phase, evr.event);
@@ -79,65 +74,80 @@ impl ListenCommand {
 								}
 							},
 							RuntimeEvent::Teerex(ee) => {
-								println!(">>>>>>>>>> integritee event: {:?}", ee);
+								println!(">>>>>>>>>> integritee teerex event: {:?}", ee);
 								count += 1;
 								match &ee {
-									my_node_runtime::pallet_teerex::Event::AddedEnclave(
-										accountid,
-										url,
-									) => {
+									my_node_runtime::pallet_teerex::Event::AddedSgxEnclave{
+										registered_by,
+										worker_url, ..
+									}
+									 => {
 										println!(
 											"AddedEnclave: {:?} at url {}",
-											accountid,
-											String::from_utf8(url.to_vec())
+											registered_by,
+											String::from_utf8(worker_url.clone().unwrap_or("none".into()).to_vec())
 												.unwrap_or_else(|_| "error".to_string())
 										);
 									},
-									my_node_runtime::pallet_teerex::Event::RemovedEnclave(
+									my_node_runtime::pallet_teerex::Event::RemovedSovereignEnclave(
 										accountid,
 									) => {
 										println!("RemovedEnclave: {:?}", accountid);
 									},
-									my_node_runtime::pallet_teerex::Event::Forwarded(shard) => {
+									my_node_runtime::pallet_teerex::Event::RemovedProxiedEnclave(
+										eia,
+									) => {
+										println!("RemovedEnclave: {:?}", eia);
+									},
+									_ => debug!("ignoring unsupported teerex event: {:?}", ee),
+								}
+							},
+							RuntimeEvent::EnclaveBridge(ee) => {
+								println!(">>>>>>>>>> integritee enclave bridge event: {:?}", ee);
+								count += 1;
+								match &ee {
+									my_node_runtime::pallet_enclave_bridge::Event::IndirectInvocationRegistered(shard) => {
 										println!(
 											"Forwarded request for shard {}",
 											shard.encode().to_base58()
 										);
 									},
-									my_node_runtime::pallet_teerex::Event::ProcessedParentchainBlock(
-										accountid,
+									my_node_runtime::pallet_enclave_bridge::Event::ProcessedParentchainBlock {
+										shard,
 										block_hash,
-										merkle_root,
+										trusted_calls_merkle_root,
 										block_number,
-									) => {
+									} => {
 										println!(
 											"ProcessedParentchainBlock from {} with hash {:?}, number {} and merkle root {:?}",
-											accountid, block_hash, merkle_root, block_number
+											shard, block_hash, trusted_calls_merkle_root, block_number
 										);
 									},
-									my_node_runtime::pallet_teerex::Event::ShieldFunds(
-										incognito_account,
-									) => {
-										println!("ShieldFunds for {:?}", incognito_account);
+									my_node_runtime::pallet_enclave_bridge::Event::ShieldFunds {
+										shard, encrypted_beneficiary, amount
+									} => {
+										println!("ShieldFunds on shard {:?} for {:?}. amount: {:?}", shard, encrypted_beneficiary, amount);
 									},
-									my_node_runtime::pallet_teerex::Event::UnshieldedFunds(
-										public_account,
-									) => {
-										println!("UnshieldFunds for {:?}", public_account);
+									my_node_runtime::pallet_enclave_bridge::Event::UnshieldedFunds {
+										shard, beneficiary, amount
+									} => {
+										println!("UnshieldFunds on shard {:?} for {:?}. amount: {:?}", shard, beneficiary, amount);
 									},
-									_ => debug!("ignoring unsupported teerex event: {:?}", ee),
+									_ => debug!("ignoring unsupported enclave_bridge event: {:?}", ee),
 								}
 							},
 							RuntimeEvent::Sidechain(ee) => {
+								println!(">>>>>>>>>> integritee sidechain event: {:?}", ee);
 								count += 1;
 								match &ee {
-									my_node_runtime::pallet_sidechain::Event::ProposedSidechainBlock(
-										accountid,
-										block_hash,
-									) => {
+									my_node_runtime::pallet_sidechain::Event::FinalizedSidechainBlock {
+										shard,
+										block_header_hash,
+										validateer,
+									} => {
 										println!(
-											"ProposedSidechainBlock from {} with hash {:?}",
-											accountid, block_hash
+											"ProposedSidechainBlock on shard {} from {} with hash {:?}",
+											shard, validateer, block_header_hash
 										);
 									},
 									_ => debug!("ignoring unsupported sidechain event: {:?}", ee),

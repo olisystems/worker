@@ -17,13 +17,14 @@
 
 use codec::{Decode, Encode};
 use core::fmt::Debug;
-use frame_support::sp_runtime::traits::Block as ParentchainBlockTrait;
+use enclave_bridge_primitives::EnclaveFingerprint;
 use itc_parentchain::primitives::{
-	ParentchainInitParams,
+	ParentchainId, ParentchainInitParams,
 	ParentchainInitParams::{Parachain, Solochain},
 };
 use itp_enclave_api::{enclave_base::EnclaveBase, sidechain::Sidechain, EnclaveResult};
 use itp_settings::worker::MR_ENCLAVE_SIZE;
+use itp_storage::StorageProof;
 use sgx_crypto_helper::rsa3072::Rsa3072PubKey;
 use sp_core::ed25519;
 
@@ -31,7 +32,7 @@ use sp_core::ed25519;
 pub struct EnclaveMock;
 
 impl EnclaveBase for EnclaveMock {
-	fn init(&self, _mu_ra_url: &str, _untrusted_url: &str) -> EnclaveResult<()> {
+	fn init(&self, _mu_ra_url: &str, _untrusted_url: &str, _base_dir: &str) -> EnclaveResult<()> {
 		Ok(())
 	}
 
@@ -48,8 +49,8 @@ impl EnclaveBase for EnclaveMock {
 		params: ParentchainInitParams,
 	) -> EnclaveResult<Header> {
 		let genesis_header_encoded = match params {
-			Solochain { params } => params.genesis_header.encode(),
-			Parachain { params } => params.genesis_header.encode(),
+			Solochain { params, .. } => params.genesis_header.encode(),
+			Parachain { params, .. } => params.genesis_header.encode(),
 		};
 		let header = Header::decode(&mut genesis_header_encoded.as_slice())?;
 		Ok(header)
@@ -59,15 +60,15 @@ impl EnclaveBase for EnclaveMock {
 		unimplemented!()
 	}
 
-	fn trigger_parentchain_block_import(&self) -> EnclaveResult<()> {
+	fn trigger_parentchain_block_import(&self, _: &ParentchainId) -> EnclaveResult<()> {
 		unimplemented!()
 	}
 
-	fn set_nonce(&self, _: u32) -> EnclaveResult<()> {
+	fn set_nonce(&self, _: u32, _: ParentchainId) -> EnclaveResult<()> {
 		unimplemented!()
 	}
 
-	fn set_node_metadata(&self, _metadata: Vec<u8>) -> EnclaveResult<()> {
+	fn set_node_metadata(&self, _metadata: Vec<u8>, _: ParentchainId) -> EnclaveResult<()> {
 		todo!()
 	}
 
@@ -79,16 +80,18 @@ impl EnclaveBase for EnclaveMock {
 		unreachable!()
 	}
 
-	fn get_mrenclave(&self) -> EnclaveResult<[u8; MR_ENCLAVE_SIZE]> {
-		Ok([1u8; MR_ENCLAVE_SIZE])
+	fn get_fingerprint(&self) -> EnclaveResult<EnclaveFingerprint> {
+		Ok([1u8; MR_ENCLAVE_SIZE].into())
 	}
 }
 
 impl Sidechain for EnclaveMock {
-	fn sync_parentchain<ParentchainBlock: ParentchainBlockTrait>(
+	fn sync_parentchain<ParentchainBlock: Encode>(
 		&self,
 		_blocks: &[sp_runtime::generic::SignedBlock<ParentchainBlock>],
-		_nonce: u32,
+		_events: &[Vec<u8>],
+		_events_proofs: &[StorageProof],
+		_: &ParentchainId,
 	) -> EnclaveResult<()> {
 		Ok(())
 	}

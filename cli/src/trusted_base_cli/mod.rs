@@ -12,22 +12,37 @@
 */
 
 use crate::{
-	trusted_base_cli::commands::{
-		balance::BalanceCommand, get_market_results::GetMarketResultsCommand, nonce::NonceCommand,
-		pay_as_bid::PayAsBidCommand, pay_as_bid_proof::PayAsBidProofCommand,
-		set_balance::SetBalanceCommand, transfer::TransferCommand,
-		unshield_funds::UnshieldFundsCommand, verify_proof::VerifyMerkleProofCommand,
-	},
-	trusted_cli::TrustedCli,
-	trusted_command_utils::get_keystore_path,
-	Cli,
+	trusted_cli::TrustedCli, trusted_command_utils::get_keystore_path, Cli, CliResult, CliResultOk,
+	ED25519_KEY_TYPE, SR25519_KEY_TYPE,
 };
 use log::*;
-use sp_application_crypto::{ed25519, sr25519};
-use sp_core::{crypto::Ss58Codec, Pair};
-use substrate_client_keystore::{KeystoreExt, LocalKeystore};
+use sp_core::crypto::Ss58Codec;
+use sp_keystore::Keystore;
+use substrate_client_keystore::LocalKeystore;
 
+// private modules defining commands.
 mod commands;
+
+// Public module re-exporting the commands.
+pub mod cmds {
+	pub use super::commands::{
+		balance::BalanceCommand, nonce::NonceCommand, set_balance::SetBalanceCommand,
+		transfer::TransferCommand, unshield_funds::UnshieldFundsCommand,
+	};
+}
+
+// Commands for the BEST-energy worker.
+// For upstream merges it is always better to have a clear separate between local code and upstream
+// code.
+pub mod oli_cmds {
+	pub use super::commands::{
+		get_market_results::GetMarketResultsCommand, pay_as_bid::PayAsBidCommand,
+		pay_as_bid_proof::PayAsBidProofCommand, verify_proof::VerifyMerkleProofCommand,
+	};
+}
+
+use cmds::*;
+use oli_cmds::*;
 
 #[derive(Subcommand)]
 pub enum TrustedBaseCommand {
@@ -66,7 +81,7 @@ pub enum TrustedBaseCommand {
 }
 
 impl TrustedBaseCommand {
-	pub fn run(&self, cli: &Cli, trusted_cli: &TrustedCli) {
+	pub fn run(&self, cli: &Cli, trusted_cli: &TrustedCli) -> CliResult {
 		match self {
 			TrustedBaseCommand::NewAccount => new_account(trusted_cli),
 			TrustedBaseCommand::ListAccounts => list_accounts(trusted_cli),
@@ -83,23 +98,33 @@ impl TrustedBaseCommand {
 	}
 }
 
-fn new_account(trusted_args: &TrustedCli) {
+fn new_account(trusted_args: &TrustedCli) -> CliResult {
 	let store = LocalKeystore::open(get_keystore_path(trusted_args), None).unwrap();
-	let key: sr25519::AppPair = store.generate().unwrap();
+	let key = LocalKeystore::sr25519_generate_new(&store, SR25519_KEY_TYPE, None).unwrap();
 	drop(store);
-	info!("new account {}", key.public().to_ss58check());
-	println!("{}", key.public().to_ss58check());
+	info!("new account {}", key.to_ss58check());
+	let key_str = key.to_ss58check();
+	println!("{}", key_str);
+
+	Ok(CliResultOk::PubKeysBase58 { pubkeys_sr25519: Some(vec![key_str]), pubkeys_ed25519: None })
 }
 
-fn list_accounts(trusted_args: &TrustedCli) {
+fn list_accounts(trusted_args: &TrustedCli) -> CliResult {
 	let store = LocalKeystore::open(get_keystore_path(trusted_args), None).unwrap();
 	info!("sr25519 keys:");
-	for pubkey in store.public_keys::<sr25519::AppPublic>().unwrap().into_iter() {
+	for pubkey in store.sr25519_public_keys(SR25519_KEY_TYPE).into_iter() {
 		println!("{}", pubkey.to_ss58check());
 	}
 	info!("ed25519 keys:");
-	for pubkey in store.public_keys::<ed25519::AppPublic>().unwrap().into_iter() {
-		println!("{}", pubkey.to_ss58check());
+	let pubkeys: Vec<String> = store
+		.ed25519_public_keys(ED25519_KEY_TYPE)
+		.into_iter()
+		.map(|pubkey| pubkey.to_ss58check())
+		.collect();
+	for pubkey in &pubkeys {
+		println!("{}", pubkey);
 	}
 	drop(store);
+
+	Ok(CliResultOk::PubKeysBase58 { pubkeys_sr25519: None, pubkeys_ed25519: Some(pubkeys) })
 }

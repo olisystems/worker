@@ -16,12 +16,18 @@
 */
 
 use clap::ArgMatches;
+use itc_rest_client::rest_client::Url;
+use itp_settings::teeracle::{DEFAULT_MARKET_DATA_UPDATE_INTERVAL, ONE_DAY, THIRTY_MINUTES};
 use parse_duration::parse;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::{
+	fs,
+	path::{Path, PathBuf},
+	time::Duration,
+};
 
-static DEFAULT_NODE_SERVER: &str = "ws://127.0.0.1";
-static DEFAULT_NODE_PORT: &str = "9944";
+static DEFAULT_INTEGRITEE_RPC_URL: &str = "ws://127.0.0.1";
+static DEFAULT_INTEGRITEE_RPC_PORT: &str = "9944";
 static DEFAULT_TRUSTED_PORT: &str = "2000";
 static DEFAULT_UNTRUSTED_PORT: &str = "2001";
 static DEFAULT_MU_RA_PORT: &str = "3443";
@@ -30,36 +36,46 @@ static DEFAULT_UNTRUSTED_HTTP_PORT: &str = "4545";
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Config {
-	pub node_ip: String,
-	pub node_port: String,
-	pub worker_ip: String,
+	integritee_rpc_url: String,
+	integritee_rpc_port: String,
+	target_a_parentchain_rpc_url: Option<String>,
+	target_a_parentchain_rpc_port: Option<String>,
+	target_b_parentchain_rpc_url: Option<String>,
+	target_b_parentchain_rpc_port: Option<String>,
+	worker_ip: String,
 	/// Trusted worker address that will be advertised on the parentchain.
-	pub trusted_external_worker_address: Option<String>,
+	trusted_external_worker_address: Option<String>,
 	/// Port to directly communicate with the trusted tls server inside the enclave.
-	pub trusted_worker_port: String,
+	trusted_worker_port: String,
 	/// Untrusted worker address that will be returned by the dedicated trusted ws rpc call.
-	pub untrusted_external_worker_address: Option<String>,
+	untrusted_external_worker_address: Option<String>,
 	/// Port to the untrusted ws of the validateer.
-	pub untrusted_worker_port: String,
+	untrusted_worker_port: String,
 	/// Mutual remote attestation address that will be returned by the dedicated trusted ws rpc call.
-	pub mu_ra_external_address: Option<String>,
+	mu_ra_external_address: Option<String>,
 	/// Port for mutual-remote attestation requests.
-	pub mu_ra_port: String,
+	mu_ra_port: String,
 	/// Enable the metrics server
-	pub enable_metrics_server: bool,
+	enable_metrics_server: bool,
 	/// Port for the metrics server
-	pub metrics_server_port: String,
+	metrics_server_port: String,
 	/// Port for the untrusted HTTP server (e.g. for `is_initialized`)
-	pub untrusted_http_port: String,
+	untrusted_http_port: String,
+	/// Data directory used by all the services.
+	data_dir: PathBuf,
 	/// Config of the 'run' subcommand
-	pub run_config: Option<RunConfig>,
+	run_config: Option<RunConfig>,
 }
 
 #[allow(clippy::too_many_arguments)]
 impl Config {
 	pub fn new(
-		node_ip: String,
-		node_port: String,
+		integritee_rpc_url: String,
+		integritee_rpc_port: String,
+		target_a_parentchain_rpc_url: Option<String>,
+		target_a_parentchain_rpc_port: Option<String>,
+		target_b_parentchain_rpc_url: Option<String>,
+		target_b_parentchain_rpc_port: Option<String>,
 		worker_ip: String,
 		trusted_external_worker_address: Option<String>,
 		trusted_worker_port: String,
@@ -70,11 +86,16 @@ impl Config {
 		enable_metrics_server: bool,
 		metrics_server_port: String,
 		untrusted_http_port: String,
+		data_dir: PathBuf,
 		run_config: Option<RunConfig>,
 	) -> Self {
 		Self {
-			node_ip,
-			node_port,
+			integritee_rpc_url,
+			integritee_rpc_port,
+			target_a_parentchain_rpc_url,
+			target_a_parentchain_rpc_port,
+			target_b_parentchain_rpc_url,
+			target_b_parentchain_rpc_port,
 			worker_ip,
 			trusted_external_worker_address,
 			trusted_worker_port,
@@ -85,13 +106,44 @@ impl Config {
 			enable_metrics_server,
 			metrics_server_port,
 			untrusted_http_port,
+			data_dir,
 			run_config,
 		}
 	}
 
-	/// Returns the client url of the node (including ws://).
-	pub fn node_url(&self) -> String {
-		format!("{}:{}", self.node_ip, self.node_port)
+	/// Integritee RPC endpoint (including ws://).
+	pub fn integritee_rpc_endpoint(&self) -> String {
+		format!("{}:{}", self.integritee_rpc_url, self.integritee_rpc_port)
+	}
+
+	pub fn target_a_parentchain_rpc_endpoint(&self) -> Option<String> {
+		if self.target_a_parentchain_rpc_url.is_some()
+			&& self.target_a_parentchain_rpc_port.is_some()
+		{
+			return Some(format!(
+				"{}:{}",
+				// Can be done better, but this code is obsolete anyhow with clap v4.
+				self.target_a_parentchain_rpc_url.clone().unwrap(),
+				self.target_a_parentchain_rpc_port.clone().unwrap()
+			))
+		};
+
+		None
+	}
+
+	pub fn target_b_parentchain_rpc_endpoint(&self) -> Option<String> {
+		if self.target_b_parentchain_rpc_url.is_some()
+			&& self.target_b_parentchain_rpc_port.is_some()
+		{
+			return Some(format!(
+				"{}:{}",
+				// Can be done better, but this code is obsolete anyhow with clap v4.
+				self.target_b_parentchain_rpc_url.clone().unwrap(),
+				self.target_b_parentchain_rpc_port.clone().unwrap()
+			))
+		};
+
+		None
 	}
 
 	pub fn trusted_worker_url_internal(&self) -> String {
@@ -130,6 +182,18 @@ impl Config {
 		}
 	}
 
+	pub fn data_dir(&self) -> &Path {
+		self.data_dir.as_path()
+	}
+
+	pub fn run_config(&self) -> &Option<RunConfig> {
+		&self.run_config
+	}
+
+	pub fn enable_metrics_server(&self) -> bool {
+		self.enable_metrics_server
+	}
+
 	pub fn try_parse_metrics_server_port(&self) -> Option<u16> {
 		self.metrics_server_port.parse::<u16>().ok()
 	}
@@ -148,11 +212,34 @@ impl From<&ArgMatches<'_>> for Config {
 		let metrics_server_port = m.value_of("metrics-port").unwrap_or(DEFAULT_METRICS_PORT);
 		let untrusted_http_port =
 			m.value_of("untrusted-http-port").unwrap_or(DEFAULT_UNTRUSTED_HTTP_PORT);
+
+		let data_dir = match m.value_of("data-dir") {
+			Some(d) => {
+				let p = PathBuf::from(d);
+				if !p.exists() {
+					log::info!("Creating new data-directory for the service {}.", p.display());
+					fs::create_dir_all(p.as_path()).unwrap();
+				} else {
+					log::info!("Starting service in existing directory {}.", p.display());
+				}
+				p
+			},
+			None => {
+				log::warn!("[Config] defaulting to data-dir = PWD because it was previous behaviour. This might change soon.\
+				Please pass the data-dir explicitly to ensure nothing breaks in your setup.");
+				pwd()
+			},
+		};
+
 		let run_config = m.subcommand_matches("run").map(RunConfig::from);
 
 		Self::new(
-			m.value_of("node-server").unwrap_or(DEFAULT_NODE_SERVER).into(),
-			m.value_of("node-port").unwrap_or(DEFAULT_NODE_PORT).into(),
+			m.value_of("integritee-rpc-url").unwrap_or(DEFAULT_INTEGRITEE_RPC_URL).into(),
+			m.value_of("integritee-rpc-port").unwrap_or(DEFAULT_INTEGRITEE_RPC_PORT).into(),
+			m.value_of("target-a-parentchain-rpc-url").map(Into::into),
+			m.value_of("target-a-parentchain-rpc-port").map(Into::into),
+			m.value_of("target-b-parentchain-rpc-url").map(Into::into),
+			m.value_of("target-b-parentchain-rpc-port").map(Into::into),
 			if m.is_present("ws-external") { "0.0.0.0".into() } else { "127.0.0.1".into() },
 			m.value_of("trusted-external-address")
 				.map(|url| add_port_if_necessary(url, trusted_port)),
@@ -166,6 +253,7 @@ impl From<&ArgMatches<'_>> for Config {
 			is_metrics_server_enabled,
 			metrics_server_port.to_string(),
 			untrusted_http_port.to_string(),
+			data_dir,
 			run_config,
 		)
 	}
@@ -174,15 +262,57 @@ impl From<&ArgMatches<'_>> for Config {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RunConfig {
 	/// Skip remote attestation. Set this flag if running enclave in SW mode
-	pub skip_ra: bool,
+	skip_ra: bool,
 	/// Set this flag if running in development mode to bootstrap enclave account on parentchain via //Alice.
-	pub dev: bool,
+	dev: bool,
 	/// Request key and state provisioning from a peer worker.
-	pub request_state: bool,
+	request_state: bool,
 	/// Shard identifier base58 encoded. Defines the shard that this worker operates on. Default is mrenclave.
-	pub shard: Option<String>,
+	shard: Option<String>,
 	/// Optional teeracle update interval
-	pub teeracle_update_interval: Option<Duration>,
+	teeracle_update_interval: Option<Duration>,
+	/// Optional teeracle reregistration interval
+	reregister_teeracle_interval: Option<Duration>,
+	/// Marblerun's Prometheus endpoint base URL
+	marblerun_base_url: Option<String>,
+}
+
+impl RunConfig {
+	pub fn skip_ra(&self) -> bool {
+		self.skip_ra
+	}
+
+	pub fn dev(&self) -> bool {
+		self.dev
+	}
+
+	pub fn request_state(&self) -> bool {
+		self.request_state
+	}
+
+	pub fn shard(&self) -> Option<&str> {
+		self.shard.as_deref()
+	}
+
+	pub fn teeracle_update_interval(&self) -> Duration {
+		self.teeracle_update_interval.unwrap_or(DEFAULT_MARKET_DATA_UPDATE_INTERVAL)
+	}
+
+	/// The periodic registration period of the teeracle.
+	///
+	/// Defaults to 23h30m, as this is slightly below the currently configured automatic
+	/// deregistration period on the Integritee chains.
+	pub fn reregister_teeracle_interval(&self) -> Duration {
+		// Todo: Derive this from chain https://github.com/integritee-network/worker/issues/1351
+		self.reregister_teeracle_interval.unwrap_or(ONE_DAY - THIRTY_MINUTES)
+	}
+
+	pub fn marblerun_base_url(&self) -> &str {
+		// This conflicts with the default port of a substrate node, but it is indeed the
+		// default port of marblerun too:
+		// https://github.com/edgelesssys/marblerun/blob/master/docs/docs/workflows/monitoring.md?plain=1#L26
+		self.marblerun_base_url.as_deref().unwrap_or("http://localhost:9944")
+	}
 }
 
 impl From<&ArgMatches<'_>> for RunConfig {
@@ -194,8 +324,25 @@ impl From<&ArgMatches<'_>> for RunConfig {
 		let teeracle_update_interval = m.value_of("teeracle-interval").map(|i| {
 			parse(i).unwrap_or_else(|e| panic!("teeracle-interval parsing error {:?}", e))
 		});
+		let reregister_teeracle_interval = m.value_of("reregister-teeracle-interval").map(|i| {
+			parse(i).unwrap_or_else(|e| panic!("teeracle-interval parsing error {:?}", e))
+		});
 
-		Self { skip_ra, dev, request_state, shard, teeracle_update_interval }
+		let marblerun_base_url = m.value_of("marblerun-url").map(|i| {
+			Url::parse(i)
+				.unwrap_or_else(|e| panic!("marblerun-url parsing error: {:?}", e))
+				.to_string()
+		});
+
+		Self {
+			skip_ra,
+			dev,
+			request_state,
+			shard,
+			teeracle_update_interval,
+			reregister_teeracle_interval,
+			marblerun_base_url,
+		}
 	}
 }
 
@@ -217,6 +364,10 @@ fn add_port_if_necessary(url: &str, port: &str) -> String {
 	}
 }
 
+pub fn pwd() -> PathBuf {
+	std::env::current_dir().expect("works on all supported platforms; qed.")
+}
+
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -228,8 +379,12 @@ mod test {
 		let config = Config::from(&empty_args);
 		let expected_worker_ip = "127.0.0.1";
 
-		assert_eq!(config.node_ip, DEFAULT_NODE_SERVER);
-		assert_eq!(config.node_port, DEFAULT_NODE_PORT);
+		assert_eq!(config.integritee_rpc_url, DEFAULT_INTEGRITEE_RPC_URL);
+		assert_eq!(config.integritee_rpc_port, DEFAULT_INTEGRITEE_RPC_PORT);
+		assert_eq!(config.target_a_parentchain_rpc_url, None);
+		assert_eq!(config.target_a_parentchain_rpc_port, None);
+		assert_eq!(config.target_b_parentchain_rpc_url, None);
+		assert_eq!(config.target_b_parentchain_rpc_port, None);
 		assert_eq!(config.trusted_worker_port, DEFAULT_TRUSTED_PORT);
 		assert_eq!(config.untrusted_worker_port, DEFAULT_UNTRUSTED_PORT);
 		assert_eq!(config.mu_ra_port, DEFAULT_MU_RA_PORT);
@@ -239,11 +394,12 @@ mod test {
 		assert!(config.mu_ra_external_address.is_none());
 		assert!(!config.enable_metrics_server);
 		assert_eq!(config.untrusted_http_port, DEFAULT_UNTRUSTED_HTTP_PORT);
+		assert_eq!(config.data_dir, pwd());
 		assert!(config.run_config.is_none());
 	}
 
 	#[test]
-	fn worker_ip_is_set_correcty_for_set_ws_external_flag() {
+	fn worker_ip_is_set_correctly_for_set_ws_external_flag() {
 		let expected_worker_ip = "0.0.0.0";
 
 		let mut args = ArgMatches::default();
@@ -267,8 +423,8 @@ mod test {
 
 		let mut args = ArgMatches::default();
 		args.args = HashMap::from([
-			("node-server", Default::default()),
-			("node-port", Default::default()),
+			("integritee-rpc-url", Default::default()),
+			("integritee-rpc-port", Default::default()),
 			("ws-external", Default::default()),
 			("trusted-external-address", Default::default()),
 			("untrusted-external-address", Default::default()),
@@ -279,8 +435,8 @@ mod test {
 			("untrusted-http-port", Default::default()),
 		]);
 		// Workaround because MatchedArg is private.
-		args.args.get_mut("node-server").unwrap().vals = vec![node_ip.into()];
-		args.args.get_mut("node-port").unwrap().vals = vec![node_port.into()];
+		args.args.get_mut("integritee-rpc-url").unwrap().vals = vec![node_ip.into()];
+		args.args.get_mut("integritee-rpc-port").unwrap().vals = vec![node_port.into()];
 		args.args.get_mut("trusted-external-address").unwrap().vals = vec![trusted_ext_addr.into()];
 		args.args.get_mut("untrusted-external-address").unwrap().vals =
 			vec![untrusted_ext_addr.into()];
@@ -292,8 +448,8 @@ mod test {
 
 		let config = Config::from(&args);
 
-		assert_eq!(config.node_ip, node_ip);
-		assert_eq!(config.node_port, node_port);
+		assert_eq!(config.integritee_rpc_url, node_ip);
+		assert_eq!(config.integritee_rpc_port, node_port);
 		assert_eq!(config.trusted_worker_port, trusted_port);
 		assert_eq!(config.untrusted_worker_port, untrusted_port);
 		assert_eq!(config.mu_ra_port, mu_ra_port);

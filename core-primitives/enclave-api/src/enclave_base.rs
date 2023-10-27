@@ -20,7 +20,7 @@ use crate::{error::Error, Enclave, EnclaveResult};
 use codec::{Decode, Encode};
 use core::fmt::Debug;
 use frame_support::ensure;
-use itc_parentchain::primitives::ParentchainInitParams;
+use itc_parentchain::primitives::{ParentchainId, ParentchainInitParams};
 use itp_enclave_api_ffi as ffi;
 use itp_settings::worker::{
 	HEADER_MAX_SIZE, MR_ENCLAVE_SIZE, SHIELDING_KEY_SIZE, SIGNING_KEY_SIZE,
@@ -29,11 +29,17 @@ use log::*;
 use sgx_crypto_helper::rsa3072::Rsa3072PubKey;
 use sgx_types::*;
 use sp_core::ed25519;
+use teerex_primitives::EnclaveFingerprint;
 
 /// Trait for base/common Enclave API functions
 pub trait EnclaveBase: Send + Sync + 'static {
 	/// Initialize the enclave (needs to be called once at application startup).
-	fn init(&self, mu_ra_addr: &str, untrusted_worker_addr: &str) -> EnclaveResult<()>;
+	fn init(
+		&self,
+		mu_ra_addr: &str,
+		untrusted_worker_addr: &str,
+		base_dir: &str,
+	) -> EnclaveResult<()>;
 
 	/// Initialize the enclave sidechain components.
 	fn init_enclave_sidechain_components(&self) -> EnclaveResult<()>;
@@ -52,26 +58,37 @@ pub trait EnclaveBase: Send + Sync + 'static {
 
 	/// Trigger the import of parentchain block explicitly. Used when initializing a light-client
 	/// with a triggered import dispatcher.
-	fn trigger_parentchain_block_import(&self) -> EnclaveResult<()>;
+	fn trigger_parentchain_block_import(&self, parentchain_id: &ParentchainId)
+		-> EnclaveResult<()>;
 
-	fn set_nonce(&self, nonce: u32) -> EnclaveResult<()>;
+	fn set_nonce(&self, nonce: u32, parentchain_id: ParentchainId) -> EnclaveResult<()>;
 
-	fn set_node_metadata(&self, metadata: Vec<u8>) -> EnclaveResult<()>;
+	fn set_node_metadata(
+		&self,
+		metadata: Vec<u8>,
+		parentchain_id: ParentchainId,
+	) -> EnclaveResult<()>;
 
 	fn get_rsa_shielding_pubkey(&self) -> EnclaveResult<Rsa3072PubKey>;
 
 	fn get_ecc_signing_pubkey(&self) -> EnclaveResult<ed25519::Public>;
 
-	fn get_mrenclave(&self) -> EnclaveResult<[u8; MR_ENCLAVE_SIZE]>;
+	fn get_fingerprint(&self) -> EnclaveResult<EnclaveFingerprint>;
 }
 
 /// EnclaveApi implementation for Enclave struct
 impl EnclaveBase for Enclave {
-	fn init(&self, mu_ra_addr: &str, untrusted_worker_addr: &str) -> EnclaveResult<()> {
+	fn init(
+		&self,
+		mu_ra_addr: &str,
+		untrusted_worker_addr: &str,
+		base_dir: &str,
+	) -> EnclaveResult<()> {
 		let mut retval = sgx_status_t::SGX_SUCCESS;
 
 		let encoded_mu_ra_addr = mu_ra_addr.encode();
 		let encoded_untrusted_worker_addr = untrusted_worker_addr.encode();
+		let encoded_base_dir = base_dir.encode();
 
 		let result = unsafe {
 			ffi::init(
@@ -81,6 +98,8 @@ impl EnclaveBase for Enclave {
 				encoded_mu_ra_addr.len() as u32,
 				encoded_untrusted_worker_addr.as_ptr(),
 				encoded_untrusted_worker_addr.len() as u32,
+				encoded_base_dir.as_ptr(),
+				encoded_base_dir.len() as u32,
 			)
 		};
 
@@ -145,33 +164,67 @@ impl EnclaveBase for Enclave {
 		Ok(())
 	}
 
-	fn trigger_parentchain_block_import(&self) -> EnclaveResult<()> {
+	fn trigger_parentchain_block_import(
+		&self,
+		parentchain_id: &ParentchainId,
+	) -> EnclaveResult<()> {
 		let mut retval = sgx_status_t::SGX_SUCCESS;
-
-		let result = unsafe { ffi::trigger_parentchain_block_import(self.eid, &mut retval) };
-
-		ensure!(result == sgx_status_t::SGX_SUCCESS, Error::Sgx(result));
-		ensure!(retval == sgx_status_t::SGX_SUCCESS, Error::Sgx(retval));
-
-		Ok(())
-	}
-
-	fn set_nonce(&self, nonce: u32) -> EnclaveResult<()> {
-		let mut retval = sgx_status_t::SGX_SUCCESS;
-
-		let result = unsafe { ffi::set_nonce(self.eid, &mut retval, &nonce) };
-
-		ensure!(result == sgx_status_t::SGX_SUCCESS, Error::Sgx(result));
-		ensure!(retval == sgx_status_t::SGX_SUCCESS, Error::Sgx(retval));
-
-		Ok(())
-	}
-
-	fn set_node_metadata(&self, metadata: Vec<u8>) -> EnclaveResult<()> {
-		let mut retval = sgx_status_t::SGX_SUCCESS;
+		let parentchain_id_enc = parentchain_id.encode();
 
 		let result = unsafe {
-			ffi::set_node_metadata(self.eid, &mut retval, metadata.as_ptr(), metadata.len() as u32)
+			ffi::trigger_parentchain_block_import(
+				self.eid,
+				&mut retval,
+				parentchain_id_enc.as_ptr(),
+				parentchain_id_enc.len() as u32,
+			)
+		};
+
+		ensure!(result == sgx_status_t::SGX_SUCCESS, Error::Sgx(result));
+		ensure!(retval == sgx_status_t::SGX_SUCCESS, Error::Sgx(retval));
+
+		Ok(())
+	}
+
+	fn set_nonce(&self, nonce: u32, parentchain_id: ParentchainId) -> EnclaveResult<()> {
+		let mut retval = sgx_status_t::SGX_SUCCESS;
+
+		let parentchain_id_enc = parentchain_id.encode();
+
+		let result = unsafe {
+			ffi::set_nonce(
+				self.eid,
+				&mut retval,
+				&nonce,
+				parentchain_id_enc.as_ptr(),
+				parentchain_id_enc.len() as u32,
+			)
+		};
+
+		ensure!(result == sgx_status_t::SGX_SUCCESS, Error::Sgx(result));
+		ensure!(retval == sgx_status_t::SGX_SUCCESS, Error::Sgx(retval));
+
+		Ok(())
+	}
+
+	fn set_node_metadata(
+		&self,
+		metadata: Vec<u8>,
+		parentchain_id: ParentchainId,
+	) -> EnclaveResult<()> {
+		let mut retval = sgx_status_t::SGX_SUCCESS;
+
+		let parentchain_id_enc = parentchain_id.encode();
+
+		let result = unsafe {
+			ffi::set_node_metadata(
+				self.eid,
+				&mut retval,
+				metadata.as_ptr(),
+				metadata.len() as u32,
+				parentchain_id_enc.as_ptr(),
+				parentchain_id_enc.len() as u32,
+			)
 		};
 
 		ensure!(result == sgx_status_t::SGX_SUCCESS, Error::Sgx(result));
@@ -223,7 +276,7 @@ impl EnclaveBase for Enclave {
 		Ok(ed25519::Public::from_raw(pubkey))
 	}
 
-	fn get_mrenclave(&self) -> EnclaveResult<[u8; MR_ENCLAVE_SIZE]> {
+	fn get_fingerprint(&self) -> EnclaveResult<EnclaveFingerprint> {
 		let mut retval = sgx_status_t::SGX_SUCCESS;
 		let mut mr_enclave = [0u8; MR_ENCLAVE_SIZE];
 
@@ -239,7 +292,7 @@ impl EnclaveBase for Enclave {
 		ensure!(result == sgx_status_t::SGX_SUCCESS, Error::Sgx(result));
 		ensure!(retval == sgx_status_t::SGX_SUCCESS, Error::Sgx(retval));
 
-		Ok(mr_enclave)
+		Ok(mr_enclave.into())
 	}
 }
 

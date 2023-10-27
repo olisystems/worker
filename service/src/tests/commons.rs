@@ -36,7 +36,12 @@ pub fn local_worker_config(
 	mu_ra_port: String,
 ) -> Config {
 	let mut url = worker_url.split(':');
+
 	Config::new(
+		Default::default(),
+		Default::default(),
+		Default::default(),
+		Default::default(),
 		Default::default(),
 		Default::default(),
 		url.next().unwrap().into(),
@@ -49,6 +54,7 @@ pub fn local_worker_config(
 		false,
 		"8787".to_string(),
 		"4545".to_string(),
+		crate::config::pwd(),
 		None,
 	)
 }

@@ -15,32 +15,41 @@
 
 */
 
-use crate::{benchmark::BenchmarkCommand, Cli};
+use crate::{benchmark::BenchmarkCommand, Cli, CliResult};
 
 #[cfg(feature = "evm")]
 use crate::evm::EvmCommand;
-use crate::trusted_base_cli::TrustedBaseCommand;
+
+pub use crate::trusted_base_cli::cmds::{
+	BalanceCommand, NonceCommand, SetBalanceCommand, TransferCommand, UnshieldFundsCommand,
+};
+
+pub use crate::trusted_base_cli::oli_cmds::{
+	GetMarketResultsCommand, PayAsBidCommand, PayAsBidProofCommand, VerifyMerkleProofCommand,
+};
+
+pub use crate::trusted_base_cli::TrustedBaseCommand;
 
 #[derive(Args)]
 pub struct TrustedCli {
 	/// targeted worker MRENCLAVE
 	#[clap(short, long)]
-	pub(crate) mrenclave: String,
+	pub mrenclave: String,
 
 	/// shard identifier
 	#[clap(short, long)]
-	pub(crate) shard: Option<String>,
+	pub shard: Option<String>,
 
 	/// signer for publicly observable extrinsic
 	#[clap(short='a', long, default_value_t = String::from("//Alice"))]
-	pub(crate) xt_signer: String,
+	pub xt_signer: String,
 
 	/// insert if direct invocation call is desired
 	#[clap(short, long)]
-	pub(crate) direct: bool,
+	pub direct: bool,
 
 	#[clap(subcommand)]
-	pub(crate) command: TrustedCommand,
+	pub command: TrustedCommand,
 }
 
 #[derive(Subcommand)]
@@ -57,7 +66,7 @@ pub enum TrustedCommand {
 }
 
 impl TrustedCli {
-	pub(crate) fn run(&self, cli: &Cli) {
+	pub(crate) fn run(&self, cli: &Cli) -> CliResult {
 		match &self.command {
 			TrustedCommand::BaseTrusted(cmd) => cmd.run(cli, self),
 			TrustedCommand::Benchmark(cmd) => cmd.run(cli, self),

@@ -15,24 +15,27 @@
 
 */
 
-use itc_parentchain_test::{
-	parentchain_block_builder::ParentchainBlockBuilder,
-	parentchain_header_builder::ParentchainHeaderBuilder,
+use itc_parentchain_test::{ParentchainBlockBuilder, ParentchainHeaderBuilder};
+use itp_node_api::api_client::{ApiResult, Block, ChainApi, SignedBlock};
+use itp_types::{
+	parentchain::{Hash, Header, StorageProof},
+	H256,
 };
-use itp_node_api::api_client::{ApiResult, ChainApi, StorageProof};
-use itp_types::{Header, SignedBlock, H256};
-use sp_finality_grandpa::AuthorityList;
+use sp_consensus_grandpa::AuthorityList;
 
 pub struct ParentchainApiMock {
 	parentchain: Vec<SignedBlock>,
 }
 
 impl ParentchainApiMock {
+	// Todo: Remove when #1451 is resolved
+	#[allow(unused)]
 	pub(crate) fn new() -> Self {
 		ParentchainApiMock { parentchain: Vec::new() }
 	}
 
 	/// Initializes parentchain with a default block chain of a given length.
+	// Todo: Remove when #1451 is resolved
 	pub fn with_default_blocks(mut self, number_of_blocks: u32) -> Self {
 		self.parentchain = (1..=number_of_blocks)
 			.map(|n| {
@@ -45,19 +48,24 @@ impl ParentchainApiMock {
 }
 
 impl ChainApi for ParentchainApiMock {
+	type Hash = Hash;
+	type Block = Block;
+	type Header = Header;
+	type BlockNumber = u32;
+
 	fn last_finalized_block(&self) -> ApiResult<Option<SignedBlock>> {
 		Ok(self.parentchain.last().cloned())
 	}
 
-	fn signed_block(&self, _hash: Option<H256>) -> ApiResult<Option<SignedBlock>> {
+	fn signed_block(&self, _hash: Option<Hash>) -> ApiResult<Option<SignedBlock>> {
 		todo!()
 	}
 
-	fn get_genesis_hash(&self) -> ApiResult<H256> {
+	fn get_genesis_hash(&self) -> ApiResult<Hash> {
 		todo!()
 	}
 
-	fn get_header(&self, _header_hash: Option<H256>) -> ApiResult<Option<Header>> {
+	fn header(&self, _header_hash: Option<Hash>) -> ApiResult<Option<Header>> {
 		todo!()
 	}
 
@@ -77,11 +85,19 @@ impl ChainApi for ParentchainApiMock {
 		todo!()
 	}
 
-	fn grandpa_authorities(&self, _hash: Option<H256>) -> ApiResult<AuthorityList> {
+	fn grandpa_authorities(&self, _hash: Option<Hash>) -> ApiResult<AuthorityList> {
 		todo!()
 	}
 
-	fn grandpa_authorities_proof(&self, _hash: Option<H256>) -> ApiResult<StorageProof> {
+	fn grandpa_authorities_proof(&self, _hash: Option<Hash>) -> ApiResult<StorageProof> {
 		todo!()
+	}
+
+	fn get_events_value_proof(&self, _block_hash: Option<H256>) -> ApiResult<StorageProof> {
+		Ok(Default::default())
+	}
+
+	fn get_events_for_block(&self, _block_hash: Option<H256>) -> ApiResult<Vec<u8>> {
+		Ok(Default::default())
 	}
 }

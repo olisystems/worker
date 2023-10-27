@@ -149,8 +149,8 @@ where
 		let mut peer_urls = Vec::<String>::new();
 		for enclave in enclaves {
 			// FIXME: This is temporary only, as block broadcasting should be moved to trusted ws server.
-			let enclave_url = enclave.url.clone();
-			let worker_api_direct = DirectWorkerApi::new(enclave.url);
+			let enclave_url = String::from_utf8(enclave.instance_url().unwrap()).unwrap();
+			let worker_api_direct = DirectWorkerApi::new(enclave_url.clone());
 			match worker_api_direct.get_untrusted_worker_url() {
 				Ok(untrusted_worker_url) => {
 					peer_urls.push(untrusted_worker_url);
@@ -188,7 +188,7 @@ mod tests {
 	use frame_support::assert_ok;
 	use itp_node_api::node_api_factory::NodeApiFactory;
 	use its_primitives::types::block::SignedBlock as SignedSidechainBlock;
-	use its_test::sidechain_block_builder::SidechainBlockBuilder;
+	use its_test::sidechain_block_builder::{SidechainBlockBuilder, SidechainBlockBuilderTrait};
 	use jsonrpsee::{ws_server::WsServerBuilder, RpcModule};
 	use log::debug;
 	use sp_keyring::AccountKeyring;

@@ -36,7 +36,12 @@ mod block_import;
 mod block_import_confirmation_handler;
 mod block_import_queue_worker;
 mod error;
+mod header_db;
 mod peer_block_sync;
+
+// The feature flag will be removed once we use the module outside of tests.
+#[cfg(test)]
+mod is_descendant_of_builder;
 
 #[cfg(test)]
 mod test;
@@ -63,6 +68,7 @@ where
 		&self,
 		block: SignedSidechainBlock,
 		parentchain_header: &ParentchainBlock::Header,
+		shard: ShardIdentifierFor<SignedSidechainBlock>,
 		ctx: &Self::Context,
 	) -> Result<Self::BlockImportParams>;
 }

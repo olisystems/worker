@@ -24,6 +24,7 @@ use itp_settings::worker::EXTRINSIC_MAX_SIZE;
 use itp_types::ShardIdentifier;
 use log::*;
 use sgx_types::*;
+use teerex_primitives::Fmspc;
 
 const OS_SYSTEM_PATH: &str = "/usr/lib/x86_64-linux-gnu/";
 const C_STRING_ENDING: &str = "\0";
@@ -32,8 +33,6 @@ const QE3_ENCLAVE: &str = "libsgx_qe3.signed.so.1";
 const ID_ENCLAVE: &str = "libsgx_id_enclave.signed.so.1";
 const LIBDCAP_QUOTEPROV: &str = "libdcap_quoteprov.so.1";
 const QVE_ENCLAVE: &str = "libsgx_qve.signed.so.1";
-
-type Fmspc = [u8; 6];
 
 /// Struct that unites all relevant data reported by the QVE
 pub struct QveReport {
@@ -48,6 +47,12 @@ pub trait RemoteAttestation {
 	fn generate_ias_ra_extrinsic(&self, w_url: &str, skip_ra: bool) -> EnclaveResult<Vec<u8>>;
 
 	fn generate_dcap_ra_extrinsic(&self, w_url: &str, skip_ra: bool) -> EnclaveResult<Vec<u8>>;
+	fn generate_dcap_ra_extrinsic_from_quote(
+		&self,
+		url: String,
+		quote: &[u8],
+	) -> EnclaveResult<Vec<u8>>;
+	fn generate_dcap_ra_quote(&self, skip_ra: bool) -> EnclaveResult<Vec<u8>>;
 
 	fn generate_register_quoting_enclave_extrinsic(&self, fmspc: Fmspc) -> EnclaveResult<Vec<u8>>;
 
@@ -60,6 +65,8 @@ pub trait RemoteAttestation {
 	fn dump_dcap_collateral_to_disk(&self, fmspc: Fmspc) -> EnclaveResult<()>;
 
 	fn set_ql_qe_enclave_paths(&self) -> EnclaveResult<()>;
+
+	fn set_sgx_qpl_logging(&self) -> EnclaveResult<()>;
 
 	fn qe_get_target_info(&self) -> EnclaveResult<sgx_target_info_t>;
 
@@ -108,6 +115,8 @@ pub trait TlsRemoteAttestation {
 		&self,
 		socket_fd: c_int,
 		sign_type: sgx_quote_sign_type_t,
+		quoting_enclave_target_info: Option<&sgx_target_info_t>,
+		quote_size: Option<&u32>,
 		skip_ra: bool,
 	) -> EnclaveResult<()>;
 
@@ -115,6 +124,8 @@ pub trait TlsRemoteAttestation {
 		&self,
 		socket_fd: c_int,
 		sign_type: sgx_quote_sign_type_t,
+		quoting_enclave_target_info: Option<&sgx_target_info_t>,
+		quote_size: Option<&u32>,
 		shard: &ShardIdentifier,
 		skip_ra: bool,
 	) -> EnclaveResult<()>;
@@ -125,6 +136,8 @@ impl RemoteAttestation for Enclave {
 		let mut retval = sgx_status_t::SGX_SUCCESS;
 
 		let mut unchecked_extrinsic: Vec<u8> = vec![0u8; EXTRINSIC_MAX_SIZE];
+
+		trace!("Generating dcap_ra_extrinsic with URL: {}", w_url);
 
 		let url = w_url.encode();
 
@@ -145,14 +158,88 @@ impl RemoteAttestation for Enclave {
 
 		Ok(unchecked_extrinsic)
 	}
+	fn generate_dcap_ra_extrinsic_from_quote(
+		&self,
+		url: String,
+		quote: &[u8],
+	) -> EnclaveResult<Vec<u8>> {
+		let mut retval = sgx_status_t::SGX_SUCCESS;
+		let mut unchecked_extrinsic: Vec<u8> = vec![0u8; EXTRINSIC_MAX_SIZE];
+		let url = url.encode();
+
+		let result = unsafe {
+			ffi::generate_dcap_ra_extrinsic_from_quote(
+				self.eid,
+				&mut retval,
+				url.as_ptr(),
+				url.len() as u32,
+				quote.as_ptr(),
+				quote.len() as u32,
+				unchecked_extrinsic.as_mut_ptr(),
+				unchecked_extrinsic.len() as u32,
+			)
+		};
+
+		ensure!(result == sgx_status_t::SGX_SUCCESS, Error::Sgx(result));
+		ensure!(retval == sgx_status_t::SGX_SUCCESS, Error::Sgx(retval));
+
+		Ok(unchecked_extrinsic.to_vec())
+	}
+
+	fn generate_dcap_ra_quote(&self, skip_ra: bool) -> EnclaveResult<Vec<u8>> {
+		let mut retval = sgx_status_t::SGX_SUCCESS;
+		let quoting_enclave_target_info = self.qe_get_target_info()?;
+		let quote_size = self.qe_get_quote_size()?;
+
+		let mut dcap_quote_vec: Vec<u8> = vec![0; quote_size as usize];
+		let (dcap_quote_p, dcap_quote_size) =
+			(dcap_quote_vec.as_mut_ptr(), dcap_quote_vec.len() as u32);
+
+		let result = unsafe {
+			ffi::generate_dcap_ra_quote(
+				self.eid,
+				&mut retval,
+				skip_ra.into(),
+				&quoting_enclave_target_info,
+				quote_size,
+				dcap_quote_p,
+				dcap_quote_size,
+			)
+		};
+
+		ensure!(result == sgx_status_t::SGX_SUCCESS, Error::Sgx(result));
+		ensure!(retval == sgx_status_t::SGX_SUCCESS, Error::Sgx(retval));
+
+		unsafe {
+			trace!("Generating DCAP RA Quote: {}", *dcap_quote_p);
+		}
+
+		Ok(dcap_quote_vec)
+	}
 
 	fn generate_dcap_ra_extrinsic(&self, w_url: &str, skip_ra: bool) -> EnclaveResult<Vec<u8>> {
 		let mut retval = sgx_status_t::SGX_SUCCESS;
 
 		self.set_ql_qe_enclave_paths()?;
-		let quoting_enclave_target_info = self.qe_get_target_info()?;
-		let quote_size = self.qe_get_quote_size()?;
+		let quoting_enclave_target_info = if !skip_ra {
+			match self.qe_get_target_info() {
+				Ok(target_info) => Some(target_info),
+				Err(e) => return Err(e),
+			}
+		} else {
+			None
+		};
+		let quote_size = if !skip_ra {
+			match self.qe_get_quote_size() {
+				Ok(quote_size) => Some(quote_size),
+				Err(e) => return Err(e),
+			}
+		} else {
+			None
+		};
 		info!("Retrieved quote size of {:?}", quote_size);
+
+		trace!("Generating dcap_ra_extrinsic with URL: {}", w_url);
 
 		let mut unchecked_extrinsic: Vec<u8> = vec![0u8; EXTRINSIC_MAX_SIZE];
 
@@ -167,8 +254,8 @@ impl RemoteAttestation for Enclave {
 				unchecked_extrinsic.as_mut_ptr(),
 				unchecked_extrinsic.len() as u32,
 				skip_ra.into(),
-				&quoting_enclave_target_info,
-				quote_size,
+				quoting_enclave_target_info.as_ref(),
+				quote_size.as_ref(),
 			)
 		};
 
@@ -181,6 +268,8 @@ impl RemoteAttestation for Enclave {
 	fn generate_register_quoting_enclave_extrinsic(&self, fmspc: Fmspc) -> EnclaveResult<Vec<u8>> {
 		let mut retval = sgx_status_t::SGX_SUCCESS;
 		let mut unchecked_extrinsic: Vec<u8> = vec![0u8; EXTRINSIC_MAX_SIZE];
+
+		trace!("Generating register quoting enclave");
 
 		let collateral_ptr = self.get_dcap_collateral(fmspc)?;
 
@@ -204,6 +293,8 @@ impl RemoteAttestation for Enclave {
 	fn generate_register_tcb_info_extrinsic(&self, fmspc: Fmspc) -> EnclaveResult<Vec<u8>> {
 		let mut retval = sgx_status_t::SGX_SUCCESS;
 		let mut unchecked_extrinsic: Vec<u8> = vec![0u8; EXTRINSIC_MAX_SIZE];
+
+		trace!("Generating tcb_info registration");
 
 		let collateral_ptr = self.get_dcap_collateral(fmspc)?;
 
@@ -270,6 +361,17 @@ impl RemoteAttestation for Enclave {
 		Ok(())
 	}
 
+	fn set_sgx_qpl_logging(&self) -> EnclaveResult<()> {
+		let log_level = sgx_ql_log_level_t::SGX_QL_LOG_INFO;
+		let res = unsafe { sgx_ql_set_logging_callback(forward_qpl_log, log_level) };
+		if res == sgx_quote3_error_t::SGX_QL_SUCCESS {
+			Ok(())
+		} else {
+			error!("Setting logging function failed with: {:#?}", res);
+			Err(Error::SgxQuote(res))
+		}
+	}
+
 	fn qe_get_target_info(&self) -> EnclaveResult<sgx_target_info_t> {
 		let mut quoting_enclave_target_info: sgx_target_info_t = sgx_target_info_t::default();
 		let qe3_ret = unsafe { sgx_qe_get_target_info(&mut quoting_enclave_target_info as *mut _) };
@@ -314,6 +416,55 @@ impl RemoteAttestation for Enclave {
 				collateral_ptr_ptr,
 			)
 		};
+
+		trace!("FMSPC: {:?}", hex::encode(fmspc));
+
+		if collateral_ptr.is_null() {
+			error!("PCK quote collateral data is null, sgx_status is: {}", sgx_status);
+			return Err(Error::SgxQuote(sgx_status))
+		}
+
+		trace!("collateral:");
+		// SAFETY: the previous block checks for `collateral_ptr` being null.
+		// SAFETY: the fields should be nul terminated C strings.
+		unsafe {
+			let collateral = &*collateral_ptr;
+			trace!(
+				"version: {}\n, \
+				 tee_type: {}\n, \
+				 pck_crl_issuer_chain: {:?}\n, \
+				 pck_crl_issuer_chain_size: {}\n, \
+				 root_ca_crl: {:?}\n, \
+				 root_ca_crl_size: {}\n, \
+				 pck_crl: {:?}\n, \
+				 pck_crl_size: {}\n, \
+				 tcb_info_issuer_chain: {:?}\n, \
+				 tcb_info_issuer_chain_size: {}\n, \
+				 tcb_info: {}\n, \
+				 tcb_info_size: {}\n, \
+				 qe_identity_issuer_chain: {:?}\n, \
+				 qe_identity_issuer_chain_size: {}\n, \
+				 qe_identity: {}\n, \
+				 qe_identity_size: {}\n",
+				collateral.version,
+				collateral.tee_type,
+				std::ffi::CStr::from_ptr(collateral.pck_crl_issuer_chain).to_string_lossy(),
+				collateral.pck_crl_issuer_chain_size,
+				std::ffi::CStr::from_ptr(collateral.root_ca_crl).to_string_lossy(),
+				collateral.root_ca_crl_size,
+				std::ffi::CStr::from_ptr(collateral.pck_crl).to_string_lossy(),
+				collateral.pck_crl_size,
+				std::ffi::CStr::from_ptr(collateral.tcb_info_issuer_chain).to_string_lossy(),
+				collateral.tcb_info_issuer_chain_size,
+				std::ffi::CStr::from_ptr(collateral.tcb_info).to_string_lossy(),
+				collateral.tcb_info_size,
+				std::ffi::CStr::from_ptr(collateral.qe_identity_issuer_chain).to_string_lossy(),
+				collateral.qe_identity_issuer_chain_size,
+				std::ffi::CStr::from_ptr(collateral.qe_identity).to_string_lossy(),
+				collateral.qe_identity_size,
+			);
+		};
+
 		ensure!(sgx_status == sgx_quote3_error_t::SGX_QL_SUCCESS, Error::SgxQuote(sgx_status));
 		Ok(collateral_ptr)
 	}
@@ -536,6 +687,8 @@ impl TlsRemoteAttestation for Enclave {
 		&self,
 		socket_fd: c_int,
 		sign_type: sgx_quote_sign_type_t,
+		quoting_enclave_target_info: Option<&sgx_target_info_t>,
+		quote_size: Option<&u32>,
 		skip_ra: bool,
 	) -> EnclaveResult<()> {
 		let mut retval = sgx_status_t::SGX_SUCCESS;
@@ -546,6 +699,8 @@ impl TlsRemoteAttestation for Enclave {
 				&mut retval,
 				socket_fd,
 				sign_type,
+				quoting_enclave_target_info,
+				quote_size,
 				skip_ra.into(),
 			)
 		};
@@ -560,6 +715,8 @@ impl TlsRemoteAttestation for Enclave {
 		&self,
 		socket_fd: c_int,
 		sign_type: sgx_quote_sign_type_t,
+		quoting_enclave_target_info: Option<&sgx_target_info_t>,
+		quote_size: Option<&u32>,
 		shard: &ShardIdentifier,
 		skip_ra: bool,
 	) -> EnclaveResult<()> {
@@ -573,6 +730,8 @@ impl TlsRemoteAttestation for Enclave {
 				&mut retval,
 				socket_fd,
 				sign_type,
+				quoting_enclave_target_info,
+				quote_size,
 				encoded_shard.as_ptr(),
 				encoded_shard.len() as u32,
 				skip_ra.into(),
@@ -587,7 +746,32 @@ impl TlsRemoteAttestation for Enclave {
 }
 
 fn create_system_path(file_name: &str) -> String {
-	format!("{}{}{}", OS_SYSTEM_PATH, file_name, C_STRING_ENDING)
+	info!("create_system_path:: file_name={}", &file_name);
+	let default_path = format!("{}{}", OS_SYSTEM_PATH, file_name);
+
+	let full_path = find_library_by_name(file_name).unwrap_or(default_path);
+
+	let c_terminated_path = format!("{}{}", full_path, C_STRING_ENDING);
+	info!("create_system_path:: created path={}", &c_terminated_path);
+	c_terminated_path
+}
+fn find_library_by_name(lib_name: &str) -> Option<String> {
+	use std::process::Command;
+	// ldconfig -p | grep libsgx_pce_logic.so.1
+
+	let ldconfig_output = Command::new("ldconfig").args(["-p"]).output().ok()?;
+	let possible_path = String::from_utf8(ldconfig_output.stdout)
+		.ok()?
+		.lines()
+		.filter(|line| line.contains(lib_name))
+		.map(|lib_name_and_path| {
+			lib_name_and_path
+				.rsplit_once("=>")
+				.map(|(_, lib_path)| lib_path.trim().to_owned())
+		})
+		.next()?;
+
+	possible_path
 }
 
 fn set_ql_path(path_type: sgx_ql_path_type_t, path: &str) -> EnclaveResult<()> {
@@ -606,4 +790,20 @@ fn set_qv_path(path_type: sgx_qv_path_type_t, path: &str) -> EnclaveResult<()> {
 		return Err(Error::SgxQuote(ret_val))
 	}
 	Ok(())
+}
+
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+/// Make sure that the `log_slice_ptr` points to a null terminated string.
+// This function must not be marked as `unsafe`, because `sgx_ql_set_logging_callback` expects a safe (i.e. not `unsafe`) function.
+pub extern "C" fn forward_qpl_log(log_level: sgx_ql_log_level_t, log_slice_ptr: *const c_char) {
+	if log_slice_ptr.is_null() {
+		error!("[QPL - ERROR], slice to print was NULL");
+		return
+	}
+	// This is safe, as the previous block checks for `NULL` pointer.
+	let slice = unsafe { core::ffi::CStr::from_ptr(log_slice_ptr) };
+	match log_level {
+		sgx_ql_log_level_t::SGX_QL_LOG_INFO => info!("[QPL - INFO], {:#?}", slice),
+		sgx_ql_log_level_t::SGX_QL_LOG_ERROR => error!("[QPL - ERROR], {:#?}", slice),
+	}
 }

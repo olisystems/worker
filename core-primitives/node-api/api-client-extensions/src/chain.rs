@@ -15,60 +15,87 @@
 
 */
 
-use crate::ApiResult;
-use itp_types::{Header, SignedBlock};
-use sp_core::{storage::StorageKey, Pair, H256};
-use sp_finality_grandpa::{AuthorityList, VersionedAuthorityList, GRANDPA_AUTHORITIES_KEY};
-use sp_runtime::MultiSignature;
-use substrate_api_client::{Api, ExtrinsicParams, RpcClient};
+use crate::{ApiClientError, ApiResult};
+use itp_api_client_types::{
+	storage_key,
+	traits::{GetChainInfo, GetStorage},
+	Api, Config, Request, StorageKey,
+};
+use itp_types::parentchain::{BlockNumber, StorageProof};
+use sp_consensus_grandpa::{AuthorityList, VersionedAuthorityList, GRANDPA_AUTHORITIES_KEY};
+use sp_runtime::generic::SignedBlock as GenericSignedBlock;
 
-pub type StorageProof = Vec<Vec<u8>>;
+type RawEvents = Vec<u8>;
 
 /// ApiClient extension that simplifies chain data access.
 pub trait ChainApi {
-	fn last_finalized_block(&self) -> ApiResult<Option<SignedBlock>>;
-	fn signed_block(&self, hash: Option<H256>) -> ApiResult<Option<SignedBlock>>;
-	fn get_genesis_hash(&self) -> ApiResult<H256>;
-	fn get_header(&self, header_hash: Option<H256>) -> ApiResult<Option<Header>>;
+	type Hash;
+	type Block;
+	type Header;
+	type BlockNumber;
+
+	fn last_finalized_block(&self) -> ApiResult<Option<GenericSignedBlock<Self::Block>>>;
+	fn signed_block(
+		&self,
+		hash: Option<Self::Hash>,
+	) -> ApiResult<Option<GenericSignedBlock<Self::Block>>>;
+	fn get_genesis_hash(&self) -> ApiResult<Self::Hash>;
+	fn header(&self, header_hash: Option<Self::Hash>) -> ApiResult<Option<Self::Header>>;
 	/// Fetch blocks from parentchain with blocknumber from until to, including both boundaries.
 	/// Returns a vector with one element if from equals to.
 	/// Returns an empty vector if from is greater than to.
-	fn get_blocks(&self, from: u32, to: u32) -> ApiResult<Vec<SignedBlock>>;
+	fn get_blocks(
+		&self,
+		from: Self::BlockNumber,
+		to: Self::BlockNumber,
+	) -> ApiResult<Vec<GenericSignedBlock<Self::Block>>>;
 	fn is_grandpa_available(&self) -> ApiResult<bool>;
-	fn grandpa_authorities(&self, hash: Option<H256>) -> ApiResult<AuthorityList>;
-	fn grandpa_authorities_proof(&self, hash: Option<H256>) -> ApiResult<StorageProof>;
+	fn grandpa_authorities(&self, hash: Option<Self::Hash>) -> ApiResult<AuthorityList>;
+	fn grandpa_authorities_proof(&self, hash: Option<Self::Hash>) -> ApiResult<StorageProof>;
+	fn get_events_value_proof(&self, block_hash: Option<Self::Hash>) -> ApiResult<StorageProof>;
+	fn get_events_for_block(&self, block_hash: Option<Self::Hash>) -> ApiResult<RawEvents>;
 }
 
-impl<P: Pair, Client: RpcClient, Params: ExtrinsicParams> ChainApi for Api<P, Client, Params>
+impl<RuntimeConfig, Client> ChainApi for Api<RuntimeConfig, Client>
 where
-	MultiSignature: From<P::Signature>,
+	RuntimeConfig: Config<BlockNumber = BlockNumber>,
+	Client: Request,
 {
-	fn last_finalized_block(&self) -> ApiResult<Option<SignedBlock>> {
+	type Hash = RuntimeConfig::Hash;
+	type Header = RuntimeConfig::Header;
+	type Block = RuntimeConfig::Block;
+	type BlockNumber = RuntimeConfig::BlockNumber;
+
+	fn last_finalized_block(&self) -> ApiResult<Option<GenericSignedBlock<Self::Block>>> {
 		self.get_finalized_head()?
 			.map_or_else(|| Ok(None), |hash| self.signed_block(Some(hash)))
 	}
 
-	fn signed_block(&self, hash: Option<H256>) -> ApiResult<Option<SignedBlock>> {
-		// Even though this is only a wrapper here, we want to have this in the trait
-		// to be able to be generic over the trait and mock the `signed_block` method
-		// in tests.
-		self.get_signed_block(hash)
+	fn signed_block(
+		&self,
+		hash: Option<Self::Hash>,
+	) -> ApiResult<Option<GenericSignedBlock<Self::Block>>> {
+		Ok(self.get_signed_block(hash)?.map(|block| block.into()))
 	}
 
-	fn get_genesis_hash(&self) -> ApiResult<H256> {
-		self.get_genesis_hash()
+	fn get_genesis_hash(&self) -> ApiResult<Self::Hash> {
+		self.get_block_hash(Some(0u32))?.ok_or(ApiClientError::BlockHashNotFound)
 	}
 
-	fn get_header(&self, header_hash: Option<H256>) -> ApiResult<Option<Header>> {
+	fn header(&self, header_hash: Option<Self::Hash>) -> ApiResult<Option<Self::Header>> {
 		self.get_header(header_hash)
 	}
 
-	fn get_blocks(&self, from: u32, to: u32) -> ApiResult<Vec<SignedBlock>> {
-		let mut blocks = Vec::<SignedBlock>::new();
+	fn get_blocks(
+		&self,
+		from: Self::BlockNumber,
+		to: Self::BlockNumber,
+	) -> ApiResult<Vec<GenericSignedBlock<Self::Block>>> {
+		let mut blocks = Vec::<GenericSignedBlock<Self::Block>>::new();
 
 		for n in from..=to {
 			if let Some(block) = self.get_signed_block_by_num(Some(n))? {
-				blocks.push(block);
+				blocks.push(block.into());
 			}
 		}
 		Ok(blocks)
@@ -77,20 +104,20 @@ where
 	fn is_grandpa_available(&self) -> ApiResult<bool> {
 		let genesis_hash = Some(self.get_genesis_hash().expect("Failed to get genesis hash"));
 		Ok(self
-			.get_storage_by_key_hash(StorageKey(GRANDPA_AUTHORITIES_KEY.to_vec()), genesis_hash)?
+			.get_storage_by_key(StorageKey(GRANDPA_AUTHORITIES_KEY.to_vec()), genesis_hash)?
 			.map(|v: VersionedAuthorityList| v.into())
 			.map(|v: AuthorityList| !v.is_empty())
 			.unwrap_or(false))
 	}
 
-	fn grandpa_authorities(&self, at_block: Option<H256>) -> ApiResult<AuthorityList> {
+	fn grandpa_authorities(&self, at_block: Option<Self::Hash>) -> ApiResult<AuthorityList> {
 		Ok(self
-			.get_storage_by_key_hash(StorageKey(GRANDPA_AUTHORITIES_KEY.to_vec()), at_block)?
+			.get_storage_by_key(StorageKey(GRANDPA_AUTHORITIES_KEY.to_vec()), at_block)?
 			.map(|g: VersionedAuthorityList| g.into())
 			.unwrap_or_default())
 	}
 
-	fn grandpa_authorities_proof(&self, at_block: Option<H256>) -> ApiResult<StorageProof> {
+	fn grandpa_authorities_proof(&self, at_block: Option<Self::Hash>) -> ApiResult<StorageProof> {
 		Ok(self
 			.get_storage_proof_by_keys(
 				vec![StorageKey(GRANDPA_AUTHORITIES_KEY.to_vec())],
@@ -98,5 +125,18 @@ where
 			)?
 			.map(|read_proof| read_proof.proof.into_iter().map(|bytes| bytes.0).collect())
 			.unwrap_or_default())
+	}
+
+	fn get_events_value_proof(&self, block_hash: Option<Self::Hash>) -> ApiResult<StorageProof> {
+		let key = storage_key("System", "Events");
+		Ok(self
+			.get_storage_proof_by_keys(Vec::from([key]), block_hash)?
+			.map(|read_proof| read_proof.proof.into_iter().map(|bytes| bytes.0).collect())
+			.unwrap_or_default())
+	}
+
+	fn get_events_for_block(&self, block_hash: Option<Self::Hash>) -> ApiResult<RawEvents> {
+		let key = storage_key("System", "Events");
+		Ok(self.get_opaque_storage_by_key(key, block_hash)?.unwrap_or_default())
 	}
 }
