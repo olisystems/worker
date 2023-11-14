@@ -15,8 +15,6 @@ use crate::best_energy_helpers::{get_merkle_proof_for_actor_from_file, read_mark
 use binary_merkle_tree::MerkleProof;
 use codec::{Decode, Encode};
 use ita_sgx_runtime::System;
-#[cfg(feature = "evm")]
-use ita_sgx_runtime::{AddressMapping, HashedAddressMapping};
 use itp_stf_interface::ExecuteGetter;
 use itp_stf_primitives::{
 	traits::GetterAuthorization,
