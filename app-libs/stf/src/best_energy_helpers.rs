@@ -6,6 +6,7 @@ use simplyr_lib::{MarketOutput, Order};
 use sp_core::H256;
 use sp_runtime::traits::Keccak256;
 use std::{format, fs, vec::Vec};
+use std::string::String;
 
 pub static ORDERS_DIR: &str = "./records/orders";
 pub static RESULTS_DIR: &str = "./records/market_results";
