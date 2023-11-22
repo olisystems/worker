@@ -103,8 +103,7 @@ ARG LOG_DIR=/usr/local/log
 ENV SCRIPT_DIR ${SCRIPT_DIR}
 ENV LOG_DIR ${LOG_DIR}
 
-COPY --from=builder /root/work/worker/bin/integritee-cli /usr/local/bin
-#COPY --from=builder /root/work/worker/bin/orders /usr/local/worker-cli/orders
+COPY --from=builder /home/ubuntu/work/worker/bin/integritee-cli /usr/local/bin
 COPY ./cli/*.sh /usr/local/worker-cli/
 
 RUN ls -alt /usr/local/worker-cli
