@@ -1,4 +1,4 @@
-use crate::{MerkleProofWithCodec, StfError, String};
+use crate::MerkleProofWithCodec;
 use binary_merkle_tree::merkle_proof;
 use codec::Encode;
 use itp_stf_primitives::error::StfError;
