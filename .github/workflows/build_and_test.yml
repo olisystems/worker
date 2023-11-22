@@ -245,8 +245,9 @@ jobs:
           - test: M6
             flavor_id: offchain-worker
             demo_name: demo-indirect-invocation
-            host: ubuntu-latest
-            sgx_mode: SW
+          - test: BestEnergy
+            flavor_id: offchain-worker
+            demo_name: demo-energy-market
 
     steps:
       - uses: actions/checkout@v3
@@ -309,12 +310,14 @@ jobs:
           docker tag integritee/integritee-node:1.1.3 ${{ env.INTEGRITEE_NODE }}
           docker images --all
 
-      ##
-      # Stop any stucked/running compose projects
-      ##
+      - name: Integration Test ${{ matrix.test }}-${{ matrix.flavor_id }}
+        timeout-minutes: 30
+        run: |
+          cd docker
+          docker compose -f docker-compose.yml -f ${{ matrix.demo_name }}.yml up ${{ matrix.demo_name }} --no-build --exit-code-from ${{ matrix.demo_name }}
+
       - name: Stop docker containers
         if: always()
-        continue-on-error: true
         run: |
           cd docker
           docker compose -f <(envsubst < docker-compose.yml) -f <(envsubst < ${{ matrix.demo_name }}.yml) -p ${PROJECT} stop

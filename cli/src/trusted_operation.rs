@@ -373,10 +373,13 @@ pub(crate) fn wait_until(
 }
 
 fn connection_can_be_closed(top_status: TrustedOperationStatus) -> bool {
-	matches!(
+	// BestEnergy adjustment, as the offchain worker
+	// doesn't produce sidechain blocks, submitted is
+	// ok.
+	!matches!(
 		top_status,
-		TrustedOperationStatus::Submitted
-			| TrustedOperationStatus::Future
+		// TrustedOperationStatus::Submitted
+		TrustedOperationStatus::Future
 			| TrustedOperationStatus::Ready
 			| TrustedOperationStatus::Broadcast
 	)

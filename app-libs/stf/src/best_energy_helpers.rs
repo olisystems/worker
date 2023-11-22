@@ -1,4 +1,4 @@
-use crate::MerkleProofWithCodec;
+use crate::{MerkleProofWithCodec, StfError, String};
 use binary_merkle_tree::merkle_proof;
 use codec::Encode;
 use itp_stf_primitives::error::StfError;
@@ -20,11 +20,33 @@ pub fn get_merkle_proof_for_actor_from_file(
 		.ok_or_else(|| StfError::Dispatch(format!("Leaf Index error: {:?}", actor_id)))
 }
 
+fn results_file(timestamp: &str) -> String {
+	format!("{}/{}.json", RESULTS_DIR, timestamp)
+}
+
+fn log_dir(dir: &str) {
+	log::info!("Files in {}", dir);
+	let entries = fs::read_dir(dir)
+		.unwrap()
+		.map(|res| res.map(|e| e.path()).unwrap())
+		.collect::<Vec<_>>();
+
+	for entry in entries {
+		log::info!("{:?}", entry);
+	}
+}
+
+fn orders_file(timestamp: &str) -> String {
+	format!("{}/{}.json", ORDERS_DIR, timestamp)
+}
+
 pub fn read_market_results(timestamp: &str) -> Result<MarketOutput, StfError> {
-	let file = format!("{}/{}.json", RESULTS_DIR, timestamp);
-	let content = fs::read_to_string(&file).map_err(|e| {
-		StfError::Dispatch(format!("Reading Results File: {}, Error: {:?}", file, e))
-	})?;
+	let results_file = results_file(timestamp);
+
+	log_dir(RESULTS_DIR);
+
+	let content = fs::read_to_string(results_file)
+		.map_err(|e| StfError::Dispatch(format!("Reading Results File Error: {:?}", e)))?;
 
 	serde_json::from_str(&content).map_err(|e| {
 		StfError::Dispatch(format!("Deserializing Results {:?}. Error: {:?}", content, e))
@@ -32,10 +54,11 @@ pub fn read_market_results(timestamp: &str) -> Result<MarketOutput, StfError> {
 }
 
 pub fn read_orders(timestamp: &str) -> Result<Vec<Order>, StfError> {
-	let file = format!("{}/{}.json", ORDERS_DIR, timestamp);
-	let content = fs::read_to_string(&file).map_err(|e| {
-		StfError::Dispatch(format!("Reading Orders File: {}, Error: {:?}", file, e))
-	})?;
+	log_dir(ORDERS_DIR);
+
+	let orders_file = orders_file(timestamp);
+	let content = fs::read_to_string(orders_file)
+		.map_err(|e| StfError::Dispatch(format!("Reading Orders File Error: {:?}", e)))?;
 
 	serde_json::from_str(&content).map_err(|e| {
 		StfError::Dispatch(format!("Deserializing Orders {:?}. Error: {:?}", content, e))
@@ -43,18 +66,23 @@ pub fn read_orders(timestamp: &str) -> Result<Vec<Order>, StfError> {
 }
 
 pub fn write_orders(timestamp: &str, orders: &[Order]) -> Result<(), StfError> {
-	let orders_path = format!("{}/{}.json", ORDERS_DIR, timestamp);
+	let orders_file = orders_file(timestamp);
 
 	let orders_serialized = serde_json::to_string(&orders).map_err(|e| {
 		StfError::Dispatch(format!("Serializing orders {:?}. Error: {:?}", orders, e))
 	})?;
 
-	fs::write(&orders_path, orders_serialized)
-		.map_err(|e| StfError::Dispatch(format!("Writing orders {:?}. Error: {:?}", orders, e)))
+	fs::write(&orders_file, orders_serialized)
+		.map_err(|e| StfError::Dispatch(format!("Writing orders {:?}. Error: {:?}", orders, e)))?;
+
+	log::info!("Wrote orders");
+	log_dir(ORDERS_DIR);
+
+	Ok(())
 }
 
 pub fn write_results(timestamp: &str, market_results: MarketOutput) -> Result<(), StfError> {
-	let results_path = format!("{}/{}.json", RESULTS_DIR, timestamp);
+	let results_file = results_file(timestamp);
 
 	let results_serialized = serde_json::to_string(&market_results).map_err(|e| {
 		StfError::Dispatch(format!(
@@ -63,12 +91,17 @@ pub fn write_results(timestamp: &str, market_results: MarketOutput) -> Result<()
 		))
 	})?;
 
-	fs::write(&results_path, results_serialized.as_bytes()).map_err(|e| {
+	fs::write(&results_file, results_serialized.as_bytes()).map_err(|e| {
 		StfError::Dispatch(format!(
 			"Writing market results {:?}. Error: {:?}",
 			results_serialized, e
 		))
-	})
+	})?;
+
+	log::info!("Wrote results");
+	log_dir(RESULTS_DIR);
+
+	Ok(())
 }
 
 /// Gets the merkle proof of an `actor_id` if it is in the order set.
