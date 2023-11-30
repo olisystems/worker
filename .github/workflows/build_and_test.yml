@@ -231,7 +231,7 @@ jobs:
         uses: andymckay/cancel-action@0.3
 
   integration-tests:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     if: ${{ always() }}
     needs: [build-test, build-client]
     env:
