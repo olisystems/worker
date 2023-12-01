@@ -245,9 +245,13 @@ jobs:
           - test: M6
             flavor_id: offchain-worker
             demo_name: demo-indirect-invocation
+            host: self-hosted
+            sgx_mode: HW
           - test: BestEnergy
-            flavor_id: offchain-worker
-            demo_name: demo-energy-market
+            flavor_id: sidechain
+            demo_name: demo-shielding-unshielding-multiworker
+            host: self-hosted
+            sgx_mode: HW
 
     steps:
       - uses: actions/checkout@v3
