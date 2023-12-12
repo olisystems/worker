@@ -247,11 +247,6 @@ jobs:
             demo_name: demo-shielding-unshielding-multiworker
             host: self-hosted
             sgx_mode: HW
-          - test: BestEnergy
-            flavor_id: sidechain
-            demo_name: demo-shielding-unshielding-multiworker
-            host: self-hosted
-            sgx_mode: HW
 
     steps:
       - uses: actions/checkout@v3
