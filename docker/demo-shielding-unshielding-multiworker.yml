@@ -1,5 +1,5 @@
 services:
-  demo_shielding_unshielding_multiworker:
+  demo-shielding-unshielding-multiworker:
     image: integritee-cli:${VERSION:-dev}
     devices:
       - "${SGX_PROVISION:-/dev/null}:/dev/sgx/provision"
