@@ -79,7 +79,8 @@ jobs:
       - run: docker images --all
 
       - name: Test Enclave # cargo test is not supported in the enclave, see: https://github.com/apache/incubator-teaclave-sgx-sdk/issues/232
-        if: ${{ matrix.sgx_mode != 'HW' }} # Change for OLI, can't run these tests in HW mode on Github Hosted Runners
+      # Change for OLI, can't run these tests in HW mode on Github Hosted Runners
+        if: ${{ matrix.sgx_mode != 'HW' }}
         run: docker run --rm ${{ env.DOCKER_DEVICES }} ${{ env.DOCKER_VOLUMES }} integritee-worker-${{ env.IMAGE_SUFFIX }} test --all
 
       - name: Export worker image
