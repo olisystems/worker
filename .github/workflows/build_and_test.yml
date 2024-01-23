@@ -77,7 +77,7 @@ jobs:
           -f build.Dockerfile .
 
       - run: docker images --all
-      ## comment the enclave test to fix CI tests error
+      # comment the enclave test to fix CI tests error
       # - name: Test Enclave # cargo test is not supported in the enclave, see: https://github.com/apache/incubator-teaclave-sgx-sdk/issues/232
       # # Change for OLI, can't run these tests in HW mode on Github Hosted Runners
       #   if: ${{ matrix.sgx_mode != 'HW' }}
