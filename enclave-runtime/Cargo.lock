@@ -1745,8 +1745,6 @@ dependencies = [
  "pallet-sudo",
  "parity-scale-codec",
  "rlp",
- "serde 1.0.192",
- "serde_json 1.0.108",
  "sgx_tstd",
  "sha3 0.10.8",
  "sp-core",
@@ -4701,7 +4699,7 @@ dependencies = [
 name = "toml_datetime"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3550f4e9685620ac18a50ed434eb3aec30db8ba93b0287467bca5826ea25baf1"
+checksum = "7cda73e2f1397b1262d6dfdcef8aafae14d1de7748d66822d3bfeeb6d03e5e4b"
 
 [[package]]
 name = "toml_edit"
