@@ -1745,6 +1745,8 @@ dependencies = [
  "pallet-sudo",
  "parity-scale-codec",
  "rlp",
+ "serde 1.0.192",
+ "serde_json 1.0.108",
  "sgx_tstd",
  "sha3 0.10.8",
  "sp-core",
