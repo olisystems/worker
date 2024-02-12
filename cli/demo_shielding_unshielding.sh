@@ -70,6 +70,7 @@ echo ""
 
 # the parentchain token is 12 decimal
 UNIT=$(( 10 ** 12 ))
+FEE_TOLERANCE=$((10 ** 11))
 
 # make these amounts greater than ED
 AMOUNT_SHIELD=$(( 6 * UNIT ))
@@ -100,14 +101,14 @@ function wait_assert_state()
     for i in $(seq 1 $WAIT_ROUNDS); do
         sleep $WAIT_INTERVAL_SECONDS
         state=$(${CLIENT} trusted --mrenclave "$1" "$3" "$2")
-        if [ $state -eq "$4" ]; then
+        if (( $4 >= state ? $4 - state < FEE_TOLERANCE : state - $4 < FEE_TOLERANCE)); then
             return
         else
             :
         fi
     done
     echo
-    echo "Assert $2 $3 failed, expected = $4, actual = $state"
+    echo "Assert $2 $3 failed, expected = $4, actual = $state, tolerance = $FEE_TOLERANCE"
     exit 1
 }
 
@@ -195,8 +196,8 @@ wait_assert_state ${MRENCLAVE} ${ICGACCOUNTBOB} balance ${AMOUNT_TRANSFER}
 echo "✔ ok"
 echo ""
 
-echo "* Un-shield ${AMOUNT_UNSHIELD} tokens from Alice's incognito account"
-${CLIENT} trusted --mrenclave ${MRENCLAVE} --xt-signer //Alice unshield-funds ${ICGACCOUNTALICE} //Alice ${AMOUNT_UNSHIELD}
+echo "* Un-shield ${AMOUNT_UNSHIELD} tokens from Alice's incognito account to Ferie's L1 account"
+${CLIENT} trusted --mrenclave ${MRENCLAVE} unshield-funds ${ICGACCOUNTALICE} //Ferdie ${AMOUNT_UNSHIELD}
 echo ""
 
 echo "* Wait and assert Alice's incognito account balance... "

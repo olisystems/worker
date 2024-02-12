@@ -19,15 +19,13 @@ use crate::{
 	command_utils::get_worker_api_direct,
 	get_layer_two_nonce,
 	trusted_cli::TrustedCli,
-	trusted_command_utils::{
-		decode_balance, get_identifiers, get_keystore_path, get_pair_from_str,
-	},
+	trusted_command_utils::{get_identifiers, get_keystore_path, get_pair_from_str},
 	trusted_operation::{get_json_request, get_state, perform_trusted_operation, wait_until},
 	Cli, CliResult, CliResultOk, SR25519_KEY_TYPE,
 };
 use codec::Decode;
 use hdrhistogram::Histogram;
-use ita_stf::{Getter, Index, TrustedCall, TrustedCallSigned, TrustedGetter};
+use ita_stf::{Getter, Index, TrustedCall, TrustedCallSigned, TrustedGetter, STF_TX_FEE};
 use itc_rpc_client::direct_client::{DirectApi, DirectClient};
 use itp_stf_primitives::{
 	traits::TrustedCallSigning,
@@ -66,7 +64,7 @@ pub struct BenchmarkCommand {
 
 	/// The number of iterations to execute for each client
 	#[clap(default_value_t = 30)]
-	number_iterations: u32,
+	number_iterations: u128,
 
 	/// Adds a random wait before each transaction. This is the lower bound for the interval in ms.
 	#[clap(default_value_t = 0)]
@@ -138,16 +136,15 @@ impl BenchmarkCommand {
 		println!("Nonce for account {}: {}", self.funding_account, nonce_start);
 
 		let mut accounts = Vec::new();
-
+		let initial_balance = (self.number_iterations + 1) * (STF_TX_FEE + EXISTENTIAL_DEPOSIT);
 		// Setup new accounts and initialize them with money from Alice.
 		for i in 0..self.number_clients {
 			let nonce = i + nonce_start;
-			println!("Initializing account {}", i);
+			println!("Initializing account {} with initial amount {:?}", i, initial_balance);
 
 			// Create new account to use.
 			let a = LocalKeystore::sr25519_generate_new(&store, SR25519_KEY_TYPE, None).unwrap();
 			let account = get_pair_from_str(trusted_args, a.to_string().as_str());
-			let initial_balance = 10000000;
 
 			// Transfer amount from Alice to new account.
 			let top: TrustedOperation<TrustedCallSigned, Getter> = TrustedCall::balance_transfer(
@@ -228,12 +225,12 @@ impl BenchmarkCommand {
 
 					let balance = get_balance(client.account.clone(), shard, &client.client_api);
 					println!("Balance: {}", balance.unwrap_or_default());
-					assert_eq!(client.current_balance, balance.unwrap());
+					assert_eq!(client.current_balance, balance.unwrap_or_default());
 
 					output.push(result);
 
 					// FIXME: We probably should re-fund the account in this case.
-					if client.current_balance <= EXISTENTIAL_DEPOSIT {
+					if client.current_balance <= EXISTENTIAL_DEPOSIT + STF_TX_FEE {
 						error!("Account {:?} does not have enough balance anymore. Finishing benchmark early", client.account.public());
 						break;
 					}
@@ -289,13 +286,8 @@ fn get_nonce(
 	);
 
 	let getter_start_timer = Instant::now();
-	let getter_result = get_state(direct_client, shard, &getter).unwrap_or_default();
+	let nonce = get_state::<Index>(direct_client, shard, &getter).ok().unwrap_or_default();
 	let getter_execution_time = getter_start_timer.elapsed().as_millis();
-
-	let nonce = match getter_result {
-		Some(encoded_nonce) => Index::decode(&mut encoded_nonce.as_slice()).unwrap(),
-		None => Default::default(),
-	};
 	info!("Nonce getter execution took {} ms", getter_execution_time,);
 	debug!("Retrieved {:?} nonce for {:?}", nonce, account.public());
 	nonce
@@ -374,4 +366,15 @@ fn is_submitted(s: TrustedOperationStatus) -> bool {
 
 fn is_sidechain_block(s: TrustedOperationStatus) -> bool {
 	matches!(s, InSidechainBlock(_))
+}
+
+fn decode_balance(maybe_encoded_balance: Option<Vec<u8>>) -> Option<Balance> {
+	maybe_encoded_balance.and_then(|encoded_balance| {
+		if let Ok(vd) = Balance::decode(&mut encoded_balance.as_slice()) {
+			Some(vd)
+		} else {
+			warn!("Could not decode balance. maybe hasn't been set? {:x?}", encoded_balance);
+			None
+		}
+	})
 }

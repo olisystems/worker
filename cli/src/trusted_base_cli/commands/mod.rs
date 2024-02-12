@@ -1,5 +1,7 @@
 pub mod balance;
 pub mod get_market_results;
+pub mod get_shard;
+pub mod get_shard_vault;
 pub mod nonce;
 pub mod pay_as_bid;
 pub mod pay_as_bid_proof;

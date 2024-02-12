@@ -18,6 +18,7 @@
 //! Imports parentchain blocks and executes any indirect calls found in the extrinsics.
 
 use crate::{error::Result, ImportParentchainBlocks};
+
 use ita_stf::ParentchainHeader;
 use itc_parentchain_indirect_calls_executor::ExecuteIndirectCalls;
 use itc_parentchain_light_client::{
@@ -25,6 +26,7 @@ use itc_parentchain_light_client::{
 };
 use itp_extrinsics_factory::CreateExtrinsics;
 use itp_stf_executor::traits::StfUpdateState;
+use itp_stf_interface::ShardCreationInfo;
 use itp_types::{
 	parentchain::{IdentifyParentchain, ParentchainId},
 	OpaqueCall, H256,
@@ -32,9 +34,9 @@ use itp_types::{
 use log::*;
 use sp_runtime::{
 	generic::SignedBlock as SignedBlockG,
-	traits::{Block as ParentchainBlockTrait, NumberFor},
+	traits::{Block as ParentchainBlockTrait, Header as HeaderT, NumberFor},
 };
-use std::{marker::PhantomData, sync::Arc, vec::Vec};
+use std::{marker::PhantomData, sync::Arc, vec, vec::Vec};
 
 /// Parentchain block import implementation.
 pub struct ParentchainBlockImporter<
@@ -44,10 +46,12 @@ pub struct ParentchainBlockImporter<
 	ExtrinsicsFactory,
 	IndirectCallsExecutor,
 > {
-	validator_accessor: Arc<ValidatorAccessor>,
+	pub validator_accessor: Arc<ValidatorAccessor>,
 	stf_executor: Arc<StfExecutor>,
 	extrinsics_factory: Arc<ExtrinsicsFactory>,
-	indirect_calls_executor: Arc<IndirectCallsExecutor>,
+	pub indirect_calls_executor: Arc<IndirectCallsExecutor>,
+	shard_creation_info: ShardCreationInfo,
+	pub parentchain_id: ParentchainId,
 	_phantom: PhantomData<ParentchainBlock>,
 }
 
@@ -71,12 +75,16 @@ impl<
 		stf_executor: Arc<StfExecutor>,
 		extrinsics_factory: Arc<ExtrinsicsFactory>,
 		indirect_calls_executor: Arc<IndirectCallsExecutor>,
+		shard_creation_info: ShardCreationInfo,
+		parentchain_id: ParentchainId,
 	) -> Self {
 		ParentchainBlockImporter {
 			validator_accessor,
 			stf_executor,
 			extrinsics_factory,
 			indirect_calls_executor,
+			shard_creation_info,
+			parentchain_id,
 			_phantom: Default::default(),
 		}
 	}
@@ -113,16 +121,38 @@ impl<
 		let mut calls = Vec::<OpaqueCall>::new();
 		let id = self.validator_accessor.parentchain_id();
 
-		debug!("[{:?}] Import blocks to light-client!", id);
+		debug!(
+			"[{:?}] Import {} blocks to light-client. event blocks {}",
+			id,
+			blocks_to_import.len(),
+			events_to_import.len()
+		);
+		let events_to_import_aligned: Vec<Vec<u8>> = if events_to_import.is_empty() {
+			vec![vec![]; blocks_to_import.len()]
+		} else {
+			events_to_import
+		};
 		for (signed_block, raw_events) in
-			blocks_to_import.into_iter().zip(events_to_import.into_iter())
+			blocks_to_import.into_iter().zip(events_to_import_aligned.into_iter())
 		{
 			if let Err(e) = self
 				.validator_accessor
 				.execute_mut_on_validator(|v| v.submit_block(&signed_block))
 			{
-				error!("[{:?}] Header submission to light client failed: {:?}", id, e);
+				error!("[{:?}] Header submission to light client failed for block number {} and hash {:?}: {:?}", id, signed_block.block.header().number(), signed_block.block.hash(), e);
+
 				return Err(e.into())
+			}
+
+			// check if we can fast-sync
+			if let Some(creation_block) = self.shard_creation_info.for_parentchain(id) {
+				if signed_block.block.header().number < creation_block.number {
+					trace!(
+						"fast-syncing block import, ignoring any invocations before block {:}",
+						creation_block.number
+					);
+					continue
+				}
 			}
 
 			let block = signed_block.block;
@@ -141,10 +171,11 @@ impl<
 				.indirect_calls_executor
 				.execute_indirect_calls_in_extrinsics(&block, &raw_events)
 			{
-				Ok(executed_shielding_calls) => {
-					calls.push(executed_shielding_calls);
+				Ok(Some(confirm_processed_parentchain_block_call)) => {
+					calls.push(confirm_processed_parentchain_block_call);
 				},
-				Err(_) => error!("[{:?}] Error executing relevant extrinsics", id),
+				Ok(None) => trace!("omitting confirmation call to non-integritee parentchain"),
+				Err(e) => error!("[{:?}] Error executing relevant extrinsics: {:?}", id, e),
 			};
 
 			info!(
@@ -164,5 +195,9 @@ impl<
 			.execute_mut_on_validator(|v| v.send_extrinsics(parentchain_extrinsics))?;
 
 		Ok(())
+	}
+
+	fn parentchain_id(&self) -> ParentchainId {
+		self.validator_accessor.parentchain_id()
 	}
 }

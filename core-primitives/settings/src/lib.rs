@@ -75,17 +75,14 @@ pub mod worker {
 	// the maximum size of any extrinsic that the enclave will ever generate in B
 	pub const EXTRINSIC_MAX_SIZE: usize = 13_000;
 	// the maximum size of the header
-	pub const HEADER_MAX_SIZE: usize = 200;
+	pub const HEADER_MAX_SIZE: usize = 512;
 	// maximum size of shielding key
 	pub const SHIELDING_KEY_SIZE: usize = 8192;
 	// maximum size of signing key
 	pub const SIGNING_KEY_SIZE: usize = 32;
 	// size of the MR enclave
 	pub const MR_ENCLAVE_SIZE: usize = 32;
-	// Factors to tune the initial amount of enclave funding:
-	// Should be set to a value that ensures that the enclave can register itself
-	// and the worker can run for a certain time. Only for development.
-	pub const EXISTENTIAL_DEPOSIT_FACTOR_FOR_INIT_FUNDS: u128 = 200_000;
+
 	// Should be set to a value that ensures that the enclave can register itself
 	// and that the worker can start.
 	pub const REGISTERING_FEE_FACTOR_FOR_INIT_FUNDS: u128 = 10;

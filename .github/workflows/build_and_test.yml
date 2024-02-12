@@ -244,9 +244,44 @@ jobs:
       matrix:
         include:
           - test: M6
+            flavor_id: sidechain
+            demo_name: demo-shielding-unshielding-multiworker
+            host: test-runner-sgx
+            sgx_mode: HW
+          - test: M8
+            flavor_id: sidechain
+            demo_name: demo-direct-call
+            host: test-runner-sgx
+            sgx_mode: HW
+          - test: Sidechain
+            flavor_id: sidechain
+            demo_name: demo-sidechain
+            host: test-runner-sgx
+            sgx_mode: HW
+          - test: M6
             flavor_id: offchain-worker
             demo_name: demo-shielding-unshielding-multiworker
-            host: self-hosted
+            host: test-runner-sgx
+            sgx_mode: HW
+#          - test: Teeracle
+#            flavor_id: teeracle
+#            demo_name: demo-teeracle
+#            host: test-runner-sgx
+#            sgx_mode: HW
+          - test: Teeracle
+            flavor_id: teeracle
+            demo_name: demo-teeracle-generic
+            host: test-runner-sgx
+            sgx_mode: HW
+          - test: Benchmark
+            flavor_id: sidechain
+            demo_name: sidechain-benchmark
+            host: test-runner-sgx
+            sgx_mode: HW
+          - test: EVM
+            flavor_id: sidechain-evm
+            demo_name: demo-smart-contract
+            host: test-runner-sgx
             sgx_mode: HW
 
     steps:
@@ -261,7 +296,7 @@ jobs:
           echo "PROJECT=${{ matrix.flavor_id }}-${{ matrix.demo_name }}" >> $GITHUB_ENV
           echo "VERSION=dev.$version" >> $GITHUB_ENV
           echo "WORKER_IMAGE_TAG=integritee-worker:dev.$version" >> $GITHUB_ENV
-          echo "INTEGRITEE_NODE=integritee-node:1.1.3.$version" >> $GITHUB_ENV
+          echo "INTEGRITEE_NODE=integritee-node:1.1.4.$version" >> $GITHUB_ENV
           echo "CLIENT_IMAGE_TAG=integritee-cli:dev.$version" >> $GITHUB_ENV
           if [[ ${{ matrix.sgx_mode }} == 'HW' ]]; then
              echo "SGX_PROVISION=/dev/sgx/provision" >> $GITHUB_ENV
@@ -306,8 +341,8 @@ jobs:
           fi
           docker tag integritee-worker-${{ env.IMAGE_SUFFIX }} ${{ env.WORKER_IMAGE_TAG }}
           docker tag integritee-cli-client-${{ env.IMAGE_SUFFIX }} ${{ env.CLIENT_IMAGE_TAG }}
-          docker pull integritee/integritee-node:1.1.3
-          docker tag integritee/integritee-node:1.1.3 ${{ env.INTEGRITEE_NODE }}
+          docker pull integritee/integritee-node:1.1.4
+          docker tag integritee/integritee-node:1.1.4 ${{ env.INTEGRITEE_NODE }}
           docker images --all
 
       - name: Integration Test ${{ matrix.test }}-${{ matrix.flavor_id }}

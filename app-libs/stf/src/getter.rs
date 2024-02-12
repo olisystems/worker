@@ -199,13 +199,60 @@ impl TrustedGetterSigned {
 impl ExecuteGetter for Getter {
 	fn execute(self) -> Option<Vec<u8>> {
 		match self {
-			Getter::trusted(g) => match &g.getter {
-				TrustedGetter::free_balance(who) => {
-					let info = System::account(&who);
-					debug!("TrustedGetter free_balance");
-					debug!("AccountInfo for {} is {:?}", account_id_to_string(&who), info);
-					debug!("Account free balance is {}", info.data.free);
-					Some(info.data.free.encode())
+			Getter::trusted(g) => g.execute(),
+			Getter::public(g) => g.execute(),
+		}
+	}
+
+	fn get_storage_hashes_to_update(self) -> Vec<Vec<u8>> {
+		match self {
+			Getter::trusted(g) => g.get_storage_hashes_to_update(),
+			Getter::public(g) => g.get_storage_hashes_to_update(),
+		}
+	}
+}
+
+impl ExecuteGetter for TrustedGetterSigned {
+	fn execute(self) -> Option<Vec<u8>> {
+		match self.getter {
+			TrustedGetter::free_balance(who) => {
+				let info = System::account(&who);
+				debug!("TrustedGetter free_balance");
+				debug!("AccountInfo for {} is {:?}", account_id_to_string(&who), info);
+				std::println!("⣿STF⣿ 🔍 TrustedGetter query: free balance for ⣿⣿⣿ is ⣿⣿⣿",);
+				Some(info.data.free.encode())
+			},
+			TrustedGetter::reserved_balance(who) => {
+				let info = System::account(&who);
+				debug!("TrustedGetter reserved_balance");
+				debug!("AccountInfo for {} is {:?}", account_id_to_string(&who), info);
+				debug!("Account reserved balance is {}", info.data.reserved);
+				Some(info.data.reserved.encode())
+			},
+			TrustedGetter::nonce(who) => {
+				let nonce = System::account_nonce(&who);
+				debug!("TrustedGetter nonce");
+				debug!("Account nonce is {}", nonce);
+				Some(nonce.encode())
+			},
+			#[cfg(feature = "evm")]
+			TrustedGetter::evm_nonce(who) => {
+				let evm_account = get_evm_account(&who);
+				let evm_account = HashedAddressMapping::into_account_id(evm_account);
+				let nonce = System::account_nonce(&evm_account);
+				debug!("TrustedGetter evm_nonce");
+				debug!("Account nonce is {}", nonce);
+				Some(nonce.encode())
+			},
+			#[cfg(feature = "evm")]
+			TrustedGetter::evm_account_codes(_who, evm_account) =>
+			// TODO: This probably needs some security check if who == evm_account (or assosciated)
+				if let Some(info) = get_evm_account_codes(&evm_account) {
+					debug!("TrustedGetter Evm Account Codes");
+					debug!("AccountCodes for {} is {:?}", evm_account, info);
+					Some(info) // TOOD: encoded?
+				} else {
+					None
 				},
 
 				TrustedGetter::reserved_balance(who) => {
@@ -289,4 +336,4 @@ impl ExecuteGetter for Getter {
 	fn get_storage_hashes_to_update(self) -> Vec<Vec<u8>> {
 		Vec::new()
 	}
-}
+

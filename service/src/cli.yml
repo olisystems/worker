@@ -1,5 +1,5 @@
 name: "integritee-service"
-version: "0.12.0"
+version: "0.12.10"
 about: Worker using Intel SGX TEE for Integritee-node
 authors: "Integritee AG <hello@integritee.network>"
 
@@ -124,10 +124,6 @@ subcommands:
                 long: dev
                 short: d
                 help: Set this flag if running in development mode to bootstrap enclave account on parentchain via //Alice.
-            - request-state:
-                long: request-state
-                short: r
-                help: Run the worker and request key and state provisioning from another worker.
             - teeracle-interval:
                 required: false
                 long: teeracle-interval
@@ -139,8 +135,14 @@ subcommands:
                 long: reregister
                 help: Set the teeracle reregistration interval. Example of accepted syntax <5 seconds 15 minutes 2 hours 1 days> or short <5s15m2h1d>
                 takes_value: true
+            - shielding-target:
+                required: false
+                long: shielding-target
+                short: s
+                help: set parentchain target for shielding / unshielding. only relevant for primary worker upon first start for shard. can't be changed later for a shard
+                takes_value: true
     - request-state:
-        about: join a shard by requesting key provisioning from another worker
+        about: (DEPRECATED) join a shard by requesting key provisioning from another worker
         args:
             - shard:
                 long: shard
@@ -158,7 +160,7 @@ subcommands:
     - mrenclave:
         about: Dump mrenclave to stdout. base58 encoded.
     - init-shard:
-        about: Initialize new shard (do this only if you run the first worker for that shard). if shard is not specified, the MRENCLAVE is used instead
+        about: (DEPRECATED) Initialize new shard (do this only if you run the first worker for that shard). if shard is not specified, the MRENCLAVE is used instead
         args:
             - shard:
                 required: false

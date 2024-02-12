@@ -28,7 +28,10 @@ use core::fmt::Debug;
 use itp_node_api_metadata::NodeMetadataTrait;
 use itp_node_api_metadata_provider::AccessNodeMetadata;
 use itp_stf_primitives::traits::TrustedCallVerification;
-use itp_types::{parentchain::ParentchainId, OpaqueCall};
+use itp_types::{
+	parentchain::{AccountId, BlockHash, BlockNumber, ParentchainCall, ParentchainId},
+	Moment,
+};
 
 #[cfg(feature = "mocks")]
 pub mod mocks;
@@ -36,12 +39,22 @@ pub mod parentchain_pallet;
 pub mod sudo_pallet;
 pub mod system_pallet;
 
-pub const SHARD_VAULT_KEY: &str = "ShardVaultPubKey";
+pub const SHARD_CREATION_HEADER_KEY: &str = "ShardCreationHeaderKey";
 
 /// Interface to initialize a new state.
 pub trait InitState<State, AccountId> {
 	/// Initialize a new state for a given enclave account.
 	fn init_state(enclave_account: AccountId) -> State;
+}
+
+/// Interface to query shard vault account for shard
+pub trait ShardVaultQuery<S> {
+	fn get_vault(state: &mut S) -> Option<(AccountId, ParentchainId)>;
+}
+
+/// Interface to query shard creation block information for shard on a specified parentchain
+pub trait ShardCreationQuery<S> {
+	fn get_shard_creation_info(state: &mut S) -> ShardCreationInfo;
 }
 
 /// Interface for all functions calls necessary to update an already
@@ -65,7 +78,7 @@ where
 	fn execute_call(
 		state: &mut State,
 		call: TCS,
-		calls: &mut Vec<OpaqueCall>,
+		calls: &mut Vec<ParentchainCall>,
 		node_metadata_repo: Arc<NodeMetadataRepository>,
 	) -> Result<(), Self::Error>;
 }
@@ -87,7 +100,7 @@ where
 	/// Execute a call. Callbacks are added as an `OpaqueCall`.
 	fn execute(
 		self,
-		calls: &mut Vec<OpaqueCall>,
+		calls: &mut Vec<ParentchainCall>,
 		node_metadata_repo: Arc<NodeMetadataRepository>,
 	) -> Result<(), Self::Error>;
 
@@ -101,4 +114,28 @@ pub trait ExecuteGetter {
 	fn execute(self) -> Option<Vec<u8>>;
 	/// Get storages hashes that should be updated for a specific getter.
 	fn get_storage_hashes_to_update(self) -> Vec<Vec<u8>>;
+}
+
+#[derive(Debug, Clone, Copy, Encode, Decode)]
+pub struct BlockMetadata {
+	pub number: BlockNumber,
+	pub hash: BlockHash,
+	pub timestamp: Option<Moment>,
+}
+
+#[derive(Debug, Clone, Copy, Encode, Decode)]
+pub struct ShardCreationInfo {
+	pub integritee: Option<BlockMetadata>,
+	pub target_a: Option<BlockMetadata>,
+	pub target_b: Option<BlockMetadata>,
+}
+
+impl ShardCreationInfo {
+	pub fn for_parentchain(&self, id: ParentchainId) -> Option<BlockMetadata> {
+		match id {
+			ParentchainId::Integritee => self.integritee,
+			ParentchainId::TargetA => self.target_a,
+			ParentchainId::TargetB => self.target_b,
+		}
+	}
 }
