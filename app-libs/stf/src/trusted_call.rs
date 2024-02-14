@@ -79,7 +79,8 @@ pub enum TrustedCall {
 	balance_transfer(AccountId, AccountId, Balance),
 	balance_unshield(AccountId, AccountId, Balance, ShardIdentifier), // (AccountIncognito, BeneficiaryPublicAccount, Amount, Shard)
 	balance_shield(AccountId, AccountId, Balance, ParentchainId), // (Root, AccountIncognito, Amount, origin parentchain)
-	timestamp_set(AccountId, Moment, ParentchainId),              // (Root, now)
+	pay_as_bid(AccountId, OrdersString),
+	timestamp_set(AccountId, Moment, ParentchainId), // (Root, now)
 	#[cfg(feature = "evm")]
 	evm_withdraw(AccountId, H160, Balance), // (Origin, Address EVM Account, Value)
 	// (Origin, Source, Target, Input, Value, Gas limit, Max fee per gas, Max priority fee per gas, Nonce, Access list)
@@ -450,7 +451,7 @@ where
 
 				// Send proof of execution on chain.
 				// calls is in the scope from the outside
-				calls.push(OpaqueCall::from_tuple(&(
+				calls.push(ParentchainCall::Integritee(OpaqueCall::from_tuple(&(
 					node_metadata_repo
 						.get_from_metadata(|m| m.publish_hash_call_indexes())
 						.map_err(|_| StfError::InvalidMetadata)?
@@ -458,7 +459,7 @@ where
 					order_merkle_root,
 					Vec::<itp_types::H256>::new(), // you can ignore this for now. Clients could subscribe to the hashes here to be notified when a new hash is published.
 					b"Published merkle root of an order!".to_vec(),
-				)));
+				))));
 
 				Ok(())
 			},
@@ -647,7 +648,7 @@ where
 			TrustedCall::balance_set_balance(_, _, _, _) => debug!("No storage updates needed..."),
 			TrustedCall::balance_transfer(_, _, _) => debug!("No storage updates needed..."),
 			TrustedCall::balance_unshield(_, _, _, _) => debug!("No storage updates needed..."),
-			TrustedCall::balance_shield(_, _, _) => debug!("No storage updates needed..."),
+			TrustedCall::balance_shield(_, _, _, _) => debug!("No storage updates needed..."),
 			TrustedCall::pay_as_bid(_, _) => debug!("No storage updates needed..."),
 			TrustedCall::noop(..) => debug!("No storage updates needed..."),
 			TrustedCall::balance_set_balance(..) => debug!("No storage updates needed..."),

@@ -301,7 +301,7 @@ impl ExecuteGetter for TrustedGetterSigned {
 			TrustedGetter::pay_as_bid_proof(_who, timestamp, actor_id) => {
 				let now = Instant::now();
 
-				let proof = match get_merkle_proof_for_actor_from_file(timestamp, actor_id) {
+				let proof = match get_merkle_proof_for_actor_from_file(&timestamp, &actor_id) {
 					Ok(proof) => proof,
 					Err(e) => {
 						log::error!("Getting Orders and Index Error, {:?}", e);
@@ -316,7 +316,7 @@ impl ExecuteGetter for TrustedGetterSigned {
 			},
 
 			TrustedGetter::get_market_results(_who, timestamp) => {
-				let market_results = match read_market_results(timestamp) {
+				let market_results = match read_market_results(&timestamp) {
 					Ok(market_results) => market_results,
 					Err(e) => {
 						log::error!("Getting Market Results Error, {:?}", e);

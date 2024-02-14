@@ -59,7 +59,7 @@ pub(crate) fn get_market_results(
 	)
 	.into();
 
-	let res = perform_trusted_operation(cli, trusted_args, &top).unwrap();
+	let res: Option<Vec<u8>> = perform_trusted_operation(cli, trusted_args, &top).unwrap();
 
 	match res {
 		Some(market_results) => match MarketOutput::decode(&mut market_results.as_slice()) {

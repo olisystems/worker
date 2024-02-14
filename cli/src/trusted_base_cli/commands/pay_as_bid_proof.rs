@@ -70,7 +70,7 @@ pub(crate) fn pay_as_bid_proof(
 	)
 	.into();
 
-	let res = perform_trusted_operation(cli, trusted_args, &top).unwrap();
+	let res: Option<Vec<u8>> = perform_trusted_operation(cli, trusted_args, &top).unwrap();
 
 	match res {
 		Some(_proof) => match MerkleProofWithCodec::decode(&mut &_proof[..]) {
