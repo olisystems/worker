@@ -644,11 +644,6 @@ where
 	fn get_storage_hashes_to_update(self) -> Vec<Vec<u8>> {
 		let key_hashes = Vec::new();
 		match self.call {
-			TrustedCall::noop(_) => debug!("No storage updates needed..."),
-			TrustedCall::balance_set_balance(_, _, _, _) => debug!("No storage updates needed..."),
-			TrustedCall::balance_transfer(_, _, _) => debug!("No storage updates needed..."),
-			TrustedCall::balance_unshield(_, _, _, _) => debug!("No storage updates needed..."),
-			TrustedCall::balance_shield(_, _, _, _) => debug!("No storage updates needed..."),
 			TrustedCall::pay_as_bid(_, _) => debug!("No storage updates needed..."),
 			TrustedCall::noop(..) => debug!("No storage updates needed..."),
 			TrustedCall::balance_set_balance(..) => debug!("No storage updates needed..."),

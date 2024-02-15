@@ -254,20 +254,6 @@ impl ExecuteGetter for TrustedGetterSigned {
 				} else {
 					None
 				},
-
-			TrustedGetter::reserved_balance(who) => {
-				let info = System::account(&who);
-				debug!("TrustedGetter reserved_balance");
-				debug!("AccountInfo for {} is {:?}", account_id_to_string(&who), info);
-				debug!("Account reserved balance is {}", info.data.reserved);
-				Some(info.data.reserved.encode())
-			},
-			TrustedGetter::nonce(who) => {
-				let nonce = System::account_nonce(&who);
-				debug!("TrustedGetter nonce");
-				debug!("Account nonce is {}", nonce);
-				Some(nonce.encode())
-			},
 			#[cfg(feature = "evm")]
 			TrustedGetter::evm_nonce(who) => {
 				let evm_account = get_evm_account(who);
