@@ -23,7 +23,6 @@ use log::debug;
 use sp_core::{Pair, H256};
 
 use crate::CliError;
-use codec;
 #[derive(Parser)]
 pub struct PayAsBidProofCommand {
 	/// AccountId in ss58check format

@@ -47,7 +47,6 @@ pub mod oli_cmds {
 	};
 }
 
-use cmds::*;
 use oli_cmds::*;
 
 #[derive(Subcommand)]

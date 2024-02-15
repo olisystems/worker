@@ -255,28 +255,9 @@ impl ExecuteGetter for TrustedGetterSigned {
 					None
 				},
 			#[cfg(feature = "evm")]
-			TrustedGetter::evm_nonce(who) => {
-				let evm_account = get_evm_account(who);
-				let evm_account = HashedAddressMapping::into_account_id(evm_account);
-				let nonce = System::account_nonce(&evm_account);
-				debug!("TrustedGetter evm_nonce");
-				debug!("Account nonce is {}", nonce);
-				Some(nonce.encode())
-			},
-			#[cfg(feature = "evm")]
-			TrustedGetter::evm_account_codes(_who, evm_account) =>
-			// TODO: This probably needs some security check if who == evm_account (or assosciated)
-				if let Some(info) = get_evm_account_codes(evm_account) {
-					debug!("TrustedGetter Evm Account Codes");
-					debug!("AccountCodes for {} is {:?}", evm_account, info);
-					Some(info) // TOOD: encoded?
-				} else {
-					None
-				},
-			#[cfg(feature = "evm")]
 			TrustedGetter::evm_account_storages(_who, evm_account, index) =>
 			// TODO: This probably needs some security check if who == evm_account (or assosciated)
-				if let Some(value) = get_evm_account_storages(evm_account, index) {
+				if let Some(value) = get_evm_account_storages(&evm_account, &index) {
 					debug!("TrustedGetter Evm Account Storages");
 					debug!("AccountStorages for {} is {:?}", evm_account, value);
 					Some(value.encode())
