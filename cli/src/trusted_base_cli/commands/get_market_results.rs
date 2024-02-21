@@ -16,8 +16,6 @@ use crate::{
 	trusted_operation::perform_trusted_operation, Cli, CliResult, CliResultOk,
 };
 
-use crate::CliError;
-use codec::Decode;
 use ita_stf::{Getter, TrustedCallSigned, TrustedGetter};
 use itp_stf_primitives::types::{KeyPair, TrustedOperation};
 use log::debug;
@@ -33,14 +31,7 @@ pub struct GetMarketResultsCommand {
 
 impl GetMarketResultsCommand {
 	pub(crate) fn run(&self, cli: &Cli, trusted_args: &TrustedCli) -> CliResult {
-		let results = get_market_results(cli, trusted_args, &self.account, self.timestamp.clone());
-		match results {
-			Ok(res) => Ok(CliResultOk::Matches(res)),
-			Err(e) => {
-				log::error!("Error getting results: {}", e);
-				Err(CliError::TrustedOp { msg: "Error getting results".into() })
-			},
-		}
+		get_market_results(cli, trusted_args, &self.account, self.timestamp.clone())
 	}
 }
 
@@ -49,7 +40,7 @@ pub(crate) fn get_market_results(
 	trusted_args: &TrustedCli,
 	arg_who: &str,
 	timestamp: String,
-) -> Result<MarketOutput, CliError> {
+) -> CliResult {
 	debug!("arg_who = {:?}", arg_who);
 	let who = get_pair_from_str(trusted_args, arg_who);
 
@@ -59,21 +50,8 @@ pub(crate) fn get_market_results(
 	)
 	.into();
 
-	let res: Option<Vec<u8>> = perform_trusted_operation(cli, trusted_args, &top).unwrap();
-
-	match res {
-		Some(market_results) => match MarketOutput::decode(&mut market_results.as_slice()) {
-			Ok(market_output) => Ok(market_output),
-			Err(err) => {
-				log::error!("Error deserializing results: {}", err);
-				Err(CliError::TrustedOp {
-					msg: format!("Error deserializing market results: {}", err),
-				})
-			},
-		},
-		None => {
-			log::error!("Results not found");
-			Err(CliError::TrustedOp { msg: "Results not found".into() })
-		},
-	}
+	Ok(perform_trusted_operation::<MarketOutput>(cli, trusted_args, &top).map(|results| {
+		println!("{:?}", results);
+		CliResultOk::Matches(results)
+	})?)
 }

@@ -16,13 +16,10 @@ use crate::{
 	trusted_operation::perform_trusted_operation, Cli, CliResult, CliResultOk,
 };
 
-use codec::Decode;
 use ita_stf::{Getter, MerkleProofWithCodec, TrustedCallSigned, TrustedGetter};
 use itp_stf_primitives::types::{KeyPair, TrustedOperation};
-use log::debug;
 use sp_core::{Pair, H256};
 
-use crate::CliError;
 #[derive(Parser)]
 pub struct PayAsBidProofCommand {
 	/// AccountId in ss58check format
@@ -33,23 +30,13 @@ pub struct PayAsBidProofCommand {
 
 impl PayAsBidProofCommand {
 	pub(crate) fn run(&self, cli: &Cli, trusted_args: &TrustedCli) -> CliResult {
-		// if we serialize with serde-json we can easily just pass it as
-		// an argument in the verify-proof command.
-		let results = pay_as_bid_proof(
+		pay_as_bid_proof(
 			cli,
 			trusted_args,
 			&self.account,
 			self.timestamp.clone(),
 			self.actor_id.clone(),
-		);
-
-		match results {
-			Ok(res) => Ok(CliResultOk::PayAsBidProofOutput(res)),
-			Err(e) => {
-				log::error!("Error getting proof: {}", e);
-				Err(CliError::TrustedOp { msg: "Error getting proof".into() })
-			},
-		}
+		)
 	}
 }
 
@@ -59,8 +46,7 @@ pub(crate) fn pay_as_bid_proof(
 	arg_who: &str,
 	timestamp: String,
 	actor_id: String,
-) -> Result<MerkleProofWithCodec<H256, Vec<u8>>, CliError> {
-	debug!("arg_who = {:?}", arg_who);
+) -> CliResult {
 	let who = get_pair_from_str(trusted_args, arg_who);
 
 	let top: TrustedOperation<TrustedCallSigned, Getter> = Getter::trusted(
@@ -69,21 +55,10 @@ pub(crate) fn pay_as_bid_proof(
 	)
 	.into();
 
-	let res: Option<Vec<u8>> = perform_trusted_operation(cli, trusted_args, &top).unwrap();
-
-	match res {
-		Some(_proof) => match MerkleProofWithCodec::decode(&mut &_proof[..]) {
-			Ok(_proof) => Ok(_proof),
-			Err(err) => {
-				log::error!("Error deserializing results: {}", err);
-				Err(CliError::TrustedOp {
-					msg: format!("Error deserializing market results: {}", err),
-				})
-			},
-		},
-		None => {
-			log::error!("Results not found");
-			Err(CliError::TrustedOp { msg: "Results not found".into() })
-		},
-	}
+	Ok(perform_trusted_operation::<MerkleProofWithCodec<H256, Vec<u8>>>(cli, trusted_args, &top)
+		.map(|proof| {
+			let p_string = serde_json::to_string(&proof).unwrap();
+			println!("{}", p_string);
+			CliResultOk::PayAsBidProofOutput(proof)
+		})?)
 }
