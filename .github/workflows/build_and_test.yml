@@ -525,7 +525,7 @@ jobs:
           name: integritee-worker-sidechain-${{ github.ref_name }}.tar.gz
           path: .
 
-      #
+      ##
       # Temporary comment out until we decide what to release
       #
       # - name: Download Integritee Client
