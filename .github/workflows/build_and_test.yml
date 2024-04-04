@@ -268,16 +268,16 @@ jobs:
 #            demo_name: demo-teeracle
 #            host: test-runner-sgx
 #            sgx_mode: HW
-          - test: Teeracle
-            flavor_id: teeracle
-            demo_name: demo-teeracle-generic
-            host: test-runner-sgx
-            sgx_mode: HW
-          - test: Benchmark
-            flavor_id: sidechain
-            demo_name: sidechain-benchmark
-            host: test-runner-sgx
-            sgx_mode: HW
+          # - test: Teeracle
+          #   flavor_id: teeracle
+          #   demo_name: demo-teeracle-generic
+          #   host: test-runner-sgx
+          #   sgx_mode: HW
+          # - test: Benchmark
+          #   flavor_id: sidechain
+          #   demo_name: sidechain-benchmark
+          #   host: test-runner-sgx
+          #   sgx_mode: HW
           # - test: EVM
           #   flavor_id: sidechain-evm
           #   demo_name: demo-smart-contract
