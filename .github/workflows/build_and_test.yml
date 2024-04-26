@@ -274,7 +274,7 @@ jobs:
           #   host: test-runner-sgx
           #   sgx_mode: HW
           - test: Benchmark
-            flavor_id: sidechain
+            flavor_id: offchain-worker
             demo_name: sidechain-benchmark
             host: test-runner-sgx
             sgx_mode: HW
