@@ -90,7 +90,7 @@ jobs:
           docker image save integritee-worker-${{ env.IMAGE_SUFFIX }} | gzip > integritee-worker-${{ env.IMAGE_SUFFIX }}.tar.gz
 
       - name: Upload worker image
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: integritee-worker-${{ env.IMAGE_SUFFIX }}.tar.gz
           path: integritee-worker-${{ env.IMAGE_SUFFIX }}.tar.gz
@@ -101,7 +101,7 @@ jobs:
           echo "$mrenclave_hex" > mrenclave-${{ env.IMAGE_SUFFIX }}.hex
 
       - name: Upload Enclave Digest File
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: mrenclave-${{ env.IMAGE_SUFFIX }}.hex
           path: mrenclave-${{ env.IMAGE_SUFFIX }}.hex
@@ -164,7 +164,7 @@ jobs:
           docker image save integritee-cli-client-${{ env.IMAGE_SUFFIX }} | gzip > integritee-cli-client-${{ env.IMAGE_SUFFIX }}.tar.gz
 
       - name: Upload CLI client image
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: integritee-cli-client-${{ env.IMAGE_SUFFIX }}.tar.gz
           path: integritee-cli-client-${{ env.IMAGE_SUFFIX }}.tar.gz
@@ -374,7 +374,7 @@ jobs:
 
       - name: Upload logs
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: logs-${{ matrix.test }}-${{ matrix.flavor_id }}
           path: ${{ env.LOG_DIR }}
@@ -489,7 +489,7 @@ jobs:
           docker images --all
 
       - name: Upload teeracle image
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: integritee-worker-${{ matrix.flavor_id }}-${{ github.ref_name }}.tar.gz
           path: integritee-worker-${{ matrix.flavor_id }}-${{ github.ref_name }}.tar.gz
@@ -522,7 +522,7 @@ jobs:
       #     path: .
 
       - name: Download Sidechain Image
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: integritee-worker-sidechain-${{ github.ref_name }}.tar.gz
           path: .
