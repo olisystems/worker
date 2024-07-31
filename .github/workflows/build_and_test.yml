@@ -92,7 +92,6 @@ jobs:
         with:
           name: integritee-worker-${{ env.IMAGE_SUFFIX }}.tar.gz
           path: integritee-worker-${{ env.IMAGE_SUFFIX }}.tar.gz
-          retry: 5
 
       - name: Create Enclave Digest File
         run: |
