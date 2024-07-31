@@ -45,6 +45,10 @@ jobs:
             additional_features: dcap
 
     steps:
+      - name: Enable step debugging
+        run: |
+          echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
+
       - uses: actions/checkout@v3
 
       - name: Set env
@@ -306,13 +310,13 @@ jobs:
           echo "LOG_DIR=./logs-$version" >> $GITHUB_ENV
 
       - name: Download Worker Image
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: integritee-worker-${{ env.IMAGE_SUFFIX }}.tar.gz
           path: .
 
       - name: Download CLI client Image
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: integritee-cli-client-${{ env.IMAGE_SUFFIX }}.tar.gz
           path: .
