@@ -251,11 +251,11 @@ jobs:
           #   demo_name: demo-direct-call
           #   host: test-runner-sgx
           #   sgx_mode: HW
-          # - test: Sidechain
-          #   flavor_id: sidechain
-          #   demo_name: demo-sidechain
-          #   host: test-runner-sgx
-          #   sgx_mode: HW
+          - test: Sidechain
+            flavor_id: sidechain
+            demo_name: demo-sidechain
+            host: self-hosted
+            sgx_mode: HW
           # - test: M6
           #   flavor_id: offchain-worker
           #   demo_name: demo-shielding-unshielding-multiworker
