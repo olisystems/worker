@@ -78,6 +78,18 @@ jobs:
 
       - run: docker images --all
 
+      - name: Export sidechain worker image
+        if: ${{ matrix.flavor_id == 'sidechain' }}
+        run: |
+          docker image save integritee-worker-${{ env.IMAGE_SUFFIX }} | gzip > integritee-worker-${{ env.IMAGE_SUFFIX }}.tar.gz
+
+      - name: Upload sidechain worker image
+        if: ${{ matrix.flavor_id == 'sidechain' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: integritee-worker-${{ env.IMAGE_SUFFIX }}.tar.gz
+          path: integritee-worker-${{ env.IMAGE_SUFFIX }}.tar.gz
+
       # - name: Test Enclave # cargo test is not supported in the enclave, see: https://github.com/apache/incubator-teaclave-sgx-sdk/issues/232
       #   run: docker run --rm ${{ env.DOCKER_DEVICES }} ${{ env.DOCKER_VOLUMES }} integritee-worker-${{ env.IMAGE_SUFFIX }} test --all
 
