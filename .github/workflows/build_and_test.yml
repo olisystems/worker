@@ -92,17 +92,18 @@ jobs:
           docker image save integritee-worker-${{ env.IMAGE_SUFFIX }} | gzip > integritee-worker-${{ env.IMAGE_SUFFIX }}.tar.gz
 
       - name: Upload worker image
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: integritee-worker-${{ env.IMAGE_SUFFIX }}.tar.gz
           path: integritee-worker-${{ env.IMAGE_SUFFIX }}.tar.gz
+
       - name: Create Enclave Digest File
         run: |
           mrenclave_hex=$(docker run integritee-worker-${{ env.IMAGE_SUFFIX }} mrenclave | grep -oP ':\s*\K[a-fA-F0-9]+')
           echo "$mrenclave_hex" > mrenclave-${{ env.IMAGE_SUFFIX }}.hex
 
       - name: Upload Enclave Digest File
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: mrenclave-${{ env.IMAGE_SUFFIX }}.hex
           path: mrenclave-${{ env.IMAGE_SUFFIX }}.hex
@@ -165,7 +166,7 @@ jobs:
           docker image save integritee-cli-client-${{ env.IMAGE_SUFFIX }} | gzip > integritee-cli-client-${{ env.IMAGE_SUFFIX }}.tar.gz
 
       - name: Upload CLI client image
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: integritee-cli-client-${{ env.IMAGE_SUFFIX }}.tar.gz
           path: integritee-cli-client-${{ env.IMAGE_SUFFIX }}.tar.gz
@@ -235,7 +236,7 @@ jobs:
         uses: andymckay/cancel-action@0.3
 
   integration-tests:
-    runs-on: self-hosted
+    runs-on: ${{ matrix.host }}
     if: ${{ always() }}
     needs: [ build-test, build-client ]
     env:
@@ -259,8 +260,8 @@ jobs:
           - test: Sidechain
             flavor_id: sidechain
             demo_name: demo-sidechain
-            host: ubuntu-latest
-            sgx_mode: SW
+            host: test-runner-sgx
+            sgx_mode: HW
           # - test: M6
           #   flavor_id: offchain-worker
           #   demo_name: demo-shielding-unshielding-multiworker
@@ -276,11 +277,11 @@ jobs:
           #   demo_name: demo-teeracle-generic
           #   host: test-runner-sgx
           #   sgx_mode: HW
-          # - test: Benchmark
-          #   flavor_id: sidechain
-          #   demo_name: sidechain-benchmark
-          #   host: test-runner-sgx
-          #   sgx_mode: HW
+          - test: Benchmark
+            flavor_id: sidechain
+            demo_name: sidechain-benchmark
+            host: test-runner-sgx
+            sgx_mode: HW
           # - test: EVM
           #   flavor_id: sidechain-evm
           #   demo_name: demo-smart-contract
@@ -311,13 +312,13 @@ jobs:
           echo "LOG_DIR=./logs-$version" >> $GITHUB_ENV
 
       - name: Download Worker Image
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: integritee-worker-${{ env.IMAGE_SUFFIX }}.tar.gz
           path: .
 
       - name: Download CLI client Image
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: integritee-cli-client-${{ env.IMAGE_SUFFIX }}.tar.gz
           path: .
@@ -367,7 +368,7 @@ jobs:
 
       - name: Upload logs
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: logs-${{ matrix.test }}-${{ matrix.flavor_id }}
           path: ${{ env.LOG_DIR }}
@@ -482,7 +483,7 @@ jobs:
           docker images --all
 
       - name: Upload teeracle image
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: integritee-worker-${{ matrix.flavor_id }}-${{ github.ref_name }}.tar.gz
           path: integritee-worker-${{ matrix.flavor_id }}-${{ github.ref_name }}.tar.gz
@@ -515,7 +516,7 @@ jobs:
       #     path: .
 
       - name: Download Sidechain Image
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: integritee-worker-sidechain-${{ github.ref_name }}.tar.gz
           path: .
@@ -563,7 +564,7 @@ jobs:
           draft: true
           name: Docker ${{ github.ref_name }}
           files: |
-            # integritee-worker-teeracle-${{ github.ref_name }}.tar.gz
+            integritee-worker-teeracle-${{ github.ref_name }}.tar.gz
             integritee-worker-sidechain-${{ github.ref_name }}.tar.gz
             integritee-client
             integritee-demo-validateer
