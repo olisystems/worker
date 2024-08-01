@@ -254,7 +254,7 @@ jobs:
           - test: Sidechain
             flavor_id: sidechain
             demo_name: demo-sidechain
-            host: self-hosted
+            host: test-runner-sgx
             sgx_mode: HW
           # - test: M6
           #   flavor_id: offchain-worker
