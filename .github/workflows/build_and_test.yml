@@ -83,21 +83,6 @@ jobs:
 
       - run: docker images --all
 
-      - name: Export sidechain worker image
-        if: ${{ matrix.flavor_id == 'sidechain' }}
-        run: |
-          docker image save integritee-worker-${{ env.IMAGE_SUFFIX }} | gzip > integritee-worker-${{ env.IMAGE_SUFFIX }}.tar.gz
-
-      - name: Upload sidechain worker image
-        if: ${{ matrix.flavor_id == 'sidechain' }}
-        uses: actions/upload-artifact@v3
-        with:
-          name: integritee-worker-${{ env.IMAGE_SUFFIX }}.tar.gz
-          path: integritee-worker-${{ env.IMAGE_SUFFIX }}.tar.gz
-
-      # - name: Test Enclave # cargo test is not supported in the enclave, see: https://github.com/apache/incubator-teaclave-sgx-sdk/issues/232
-      #   run: docker run --rm ${{ env.DOCKER_DEVICES }} ${{ env.DOCKER_VOLUMES }} integritee-worker-${{ env.IMAGE_SUFFIX }} test --all
-
       - name: Export worker image
         run: |
           docker image save integritee-worker-${{ env.IMAGE_SUFFIX }} | gzip > integritee-worker-${{ env.IMAGE_SUFFIX }}.tar.gz
@@ -145,7 +130,7 @@ jobs:
         run: |
           fingerprint=$RANDOM
           echo "FINGERPRINT=$fingerprint" >> $GITHUB_ENV
-          SGX_MODE_LOWERCASE=$(echo "${${{ matrix.sgx_mode }},,}")
+          SGX_MODE_LOWERCASE=$(echo "${{ matrix.sgx_mode }}" | tr '[:upper:]' '[:lower:]')
           echo "IMAGE_SUFFIX=$SGX_MODE_LOWERCASE-${{ matrix.flavor_id }}-${{ github.sha }}" >> $GITHUB_ENV
           if [[ ${{ matrix.sgx_mode }} == 'HW' ]]; then
              echo "DOCKER_DEVICES=--device=/dev/sgx/enclave --device=/dev/sgx/provision" >> $GITHUB_ENV
@@ -305,7 +290,7 @@ jobs:
       - name: Set env
         run: |
           version=$RANDOM
-          SGX_MODE_LOWERCASE=$(echo "${${{ matrix.sgx_mode }},,}")
+          SGX_MODE_LOWERCASE=$(echo "${{ matrix.sgx_mode }}" | tr '[:upper:]' '[:lower:]')
           echo "IMAGE_SUFFIX=$SGX_MODE_LOWERCASE-${{ matrix.flavor_id }}-${{ github.sha }}" >> $GITHUB_ENV
           echo "FLAVOR_ID=${{ matrix.flavor_id }}" >> $GITHUB_ENV
           echo "PROJECT=${{ matrix.flavor_id }}-${{ matrix.demo_name }}" >> $GITHUB_ENV
@@ -342,10 +327,6 @@ jobs:
           docker image load --input integritee-cli-client-${{ env.IMAGE_SUFFIX }}.tar.gz
           docker images --all
 
-      ##
-      # Before tagging, delete the old "stuck" ones to be sure that the newly created ones are the latest
-      # Without if the docker image rmi throws an error if the image doesn't exist.
-      ##
       - name: Re-name Image Tags
         run: |
           if [[ "$(docker images -q ${{ env.WORKER_IMAGE_TAG }} 2> /dev/null)" == "" ]]; then
@@ -360,9 +341,6 @@ jobs:
           docker tag integritee/integritee-node:1.13.0 ${{ env.INTEGRITEE_NODE }}
           docker images --all
 
-      ##
-      # Stop any stucked/running compose projects
-      ##
       - name: Stop docker containers
         if: always()
         continue-on-error: true
@@ -374,7 +352,6 @@ jobs:
         run: |
           cd docker
           docker compose -f <(envsubst < docker-compose.yml) -f <(envsubst < ${{ matrix.demo_name }}.yml) -p ${PROJECT} up ${{ matrix.demo_name }} --no-build --exit-code-from ${{ matrix.demo_name }} --remove-orphans
-
 
       - name: Collect Docker Logs
         continue-on-error: true
@@ -450,7 +427,7 @@ jobs:
         run: |
           fingerprint=$RANDOM
           echo "FINGERPRINT=$fingerprint" >> $GITHUB_ENV
-          SGX_MODE_LOWERCASE=$(echo "${${{ matrix.sgx_mode }},,}")
+          SGX_MODE_LOWERCASE=$(echo "${{ matrix.sgx_mode }}" | tr '[:upper:]' '[:lower:]')
           echo "IMAGE_SUFFIX=$SGX_MODE_LOWERCASE-${{ matrix.flavor_id }}-${{ github.sha }}" >> $GITHUB_ENV
           if [[ ${{ matrix.sgx_mode }} == 'HW' ]]; then
               echo "DOCKER_DEVICES=--device=/dev/sgx/enclave --device=/dev/sgx/provision" >> $GITHUB_ENV
