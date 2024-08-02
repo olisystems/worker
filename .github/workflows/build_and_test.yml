@@ -33,10 +33,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - flavor_id: offchain-worker
-            mode: offchain-worker
-            host: ubuntu-latest
-            sgx_mode: SW
+          - flavor_id: sidechain
+            mode: sidechain
+            host: integritee-builder-sgx
+            sgx_mode: HW
             additional_features: dcap
           - flavor_id: offchain-worker
             mode: offchain-worker
@@ -120,6 +120,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - flavor_id: sidechain
+            mode: sidechain
+            host: integritee-builder-sgx
+            sgx_mode: HW
+            additional_features: dcap
           - flavor_id: offchain-worker
             mode: offchain-worker
             host: ubuntu-latest
@@ -189,16 +194,16 @@ jobs:
           # Worker
           # Use release mode as the CI runs out of disk space otherwise.
           cargo clippy --release -- -D warnings,
-          # cargo clippy --release --features evm -- -D warnings,
+          cargo clippy --release --features evm -- -D warnings,
           cargo clippy --release --features sidechain -- -D warnings,
-          # cargo clippy --release --features teeracle -- -D warnings,
+          cargo clippy --release --features teeracle -- -D warnings,
           cargo clippy --release --features offchain-worker -- -D warnings,
 
           # Enclave
           cd enclave-runtime && cargo clippy -- -D warnings,
-          # cd enclave-runtime && cargo clippy --features evm -- -D warnings,
+          cd enclave-runtime && cargo clippy --features evm -- -D warnings,
           cd enclave-runtime && cargo clippy --features sidechain -- -D warnings,
-          # cd enclave-runtime && cargo clippy --features teeracle -- -D warnings,
+          cd enclave-runtime && cargo clippy --features teeracle -- -D warnings,
           cd enclave-runtime && cargo clippy --features offchain-worker -- -D warnings,
 
           # Fmt
@@ -235,7 +240,7 @@ jobs:
         uses: andymckay/cancel-action@0.3
 
   integration-tests:
-    runs-on: self-hosted
+    runs-on: ${{ matrix.host }}
     if: ${{ always() }}
     needs: [ build-test, build-client ]
     env:
@@ -299,7 +304,7 @@ jobs:
           echo "PROJECT=${{ matrix.flavor_id }}-${{ matrix.demo_name }}" >> $GITHUB_ENV
           echo "VERSION=dev.$version" >> $GITHUB_ENV
           echo "WORKER_IMAGE_TAG=integritee-worker:dev.$version" >> $GITHUB_ENV
-          echo "INTEGRITEE_NODE=integritee-node:1.1.3.$version" >> $GITHUB_ENV
+          echo "INTEGRITEE_NODE=integritee-node:1.13.0.$version" >> $GITHUB_ENV
           echo "CLIENT_IMAGE_TAG=integritee-cli:dev.$version" >> $GITHUB_ENV
           if [[ ${{ matrix.sgx_mode }} == 'HW' ]]; then
              echo "SGX_PROVISION=/dev/sgx/provision" >> $GITHUB_ENV
@@ -307,13 +312,14 @@ jobs:
              echo "AESMD=/var/run/aesmd" >> $GITHUB_ENV
              echo "SGX_QCNL=/etc/sgx_default_qcnl.conf" >> $GITHUB_ENV
           fi
+
           echo "LOG_DIR=./logs-$version" >> $GITHUB_ENV
 
-      # - name: Download Worker Image
-      #   uses: actions/download-artifact@v3
-      #   with:
-      #     name: integritee-worker${{ env.IMAGE_SUFFIX }}.tar.gz
-      #     path: .
+      - name: Download Worker Image
+        uses: actions/download-artifact@v3
+        with:
+          name: integritee-worker-${{ env.IMAGE_SUFFIX }}.tar.gz
+          path: .
 
       - name: Download CLI client Image
         uses: actions/download-artifact@v3
@@ -329,6 +335,10 @@ jobs:
           docker image load --input integritee-cli-client-${{ env.IMAGE_SUFFIX }}.tar.gz
           docker images --all
 
+      ##
+      # Before tagging, delete the old "stuck" ones to be sure that the newly created ones are the latest
+      # Without if the docker image rmi throws an error if the image doesn't exist.
+      ##
       - name: Re-name Image Tags
         run: |
           if [[ "$(docker images -q ${{ env.WORKER_IMAGE_TAG }} 2> /dev/null)" == "" ]]; then
@@ -339,10 +349,13 @@ jobs:
           fi
           docker tag integritee-worker-${{ env.IMAGE_SUFFIX }} ${{ env.WORKER_IMAGE_TAG }}
           docker tag integritee-cli-client-${{ env.IMAGE_SUFFIX }} ${{ env.CLIENT_IMAGE_TAG }}
-          docker pull integritee/integritee-node:1.1.3
-          docker tag integritee/integritee-node:1.1.3 ${{ env.INTEGRITEE_NODE }}
+          docker pull integritee/integritee-node:1.13.0
+          docker tag integritee/integritee-node:1.13.0 ${{ env.INTEGRITEE_NODE }}
           docker images --all
 
+      ##
+      # Stop any stucked/running compose projects
+      ##
       - name: Stop docker containers
         if: always()
         continue-on-error: true
@@ -475,16 +488,36 @@ jobs:
           --build-arg WORKER_MODE_ARG=${{ matrix.mode }} --build-arg SGX_COMMERCIAL_KEY=enclave-runtime/intel_sgx.pem --build-arg SGX_PASSFILE=enclave-runtime/passfile.txt --build-arg SGX_PRODUCTION=1 --build-arg ADDITIONAL_FEATURES_ARG=${{ matrix.additional_features }} --build-arg SGX_MODE=${{ matrix.sgx_mode }}
           -f build.Dockerfile .
 
-      - name: Save released teeracle
+      - name: Build Worker CLI
+        env:
+          DOCKER_BUILDKIT: 1
+        run: >
+          docker build -t integritee/${{ matrix.flavor_id }}-cli:${{ github.ref_name }}
+          --target deployed-client
+          --build-arg WORKER_MODE_ARG=${{ matrix.mode }} --build-arg ADDITIONAL_FEATURES_ARG=${{ matrix.additional_features }}
+          -f build.Dockerfile .
+
+      - name: Save worker docker image
         run: |
           docker image save integritee/${{ matrix.flavor_id }}:${{ github.ref_name }} | gzip > integritee-worker-${{ matrix.flavor_id }}-${{ github.ref_name }}.tar.gz
           docker images --all
 
-      - name: Upload teeracle image
+      - name: Save CLI docker image
+        run: |
+          docker image save integritee/${{ matrix.flavor_id }}-cli:${{ github.ref_name }} | gzip > ${{ matrix.flavor_id }}-cli-${{ github.ref_name }}.tar.gz
+          docker images --all
+
+      - name: Upload image
         uses: actions/upload-artifact@v3
         with:
           name: integritee-worker-${{ matrix.flavor_id }}-${{ github.ref_name }}.tar.gz
           path: integritee-worker-${{ matrix.flavor_id }}-${{ github.ref_name }}.tar.gz
+
+      - name: Upload cli image
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.flavor_id }}-cli-${{ github.ref_name }}.tar.gz
+          path: ${{ matrix.flavor_id }}-cli-${{ github.ref_name }}.tar.gz
 
       - name: Delete images
         run: |
@@ -513,13 +546,13 @@ jobs:
       #     name: integritee-worker-teeracle-${{ github.ref_name }}.tar.gz
       #     path: .
 
-      # - name: Download Sidechain Image
-      #   uses: actions/download-artifact@v3
-      #   with:
-      #     name: integritee-worker-sidechain-${{ github.ref_name }}.tar.gz
-      #     path: .
+      - name: Download Sidechain Image
+        uses: actions/download-artifact@v3
+        with:
+          name: integritee-worker-sidechain-${{ github.ref_name }}.tar.gz
+          path: .
 
-      ##
+      #
       # Temporary comment out until we decide what to release
       #
       # - name: Download Integritee Client
@@ -562,8 +595,10 @@ jobs:
           draft: true
           name: Docker ${{ github.ref_name }}
           files: |
-            # integritee-worker-teeracle-${{ github.ref_name }}.tar.gz
+            integritee-worker-teeracle-${{ github.ref_name }}.tar.gz
             integritee-worker-sidechain-${{ github.ref_name }}.tar.gz
+            sidechain-cli-${{ github.ref_name }}.tar.gz
+            teeracle-cli-${{ github.ref_name }}.tar.gz
             integritee-client
             integritee-demo-validateer
             enclave.signed.so
