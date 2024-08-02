@@ -274,6 +274,7 @@ jobs:
           - test: BestEnergy
             flavor_id: offchain-worker
             demo_name: demo-energy-market
+            host: self-hosted
           - test: M8
             flavor_id: sidechain
             demo_name: demo-direct-call
