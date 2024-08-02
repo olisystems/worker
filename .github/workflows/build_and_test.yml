@@ -35,8 +35,8 @@ jobs:
         include:
           - flavor_id: sidechain
             mode: sidechain
-            host: integritee-builder-sgx
-            sgx_mode: HW
+            host: ubuntu-latest
+            sgx_mode: SW
             additional_features: dcap
           - flavor_id: offchain-worker
             mode: offchain-worker
@@ -120,11 +120,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - flavor_id: sidechain
-            mode: sidechain
-            host: integritee-builder-sgx
-            sgx_mode: HW
-            additional_features: dcap
+          # - flavor_id: sidechain
+          #   mode: sidechain
+          #   host: ubuntu-latest
+          #   sgx_mode: HW
+          #   additional_features: dcap
           - flavor_id: offchain-worker
             mode: offchain-worker
             host: ubuntu-latest
@@ -256,16 +256,19 @@ jobs:
           #   demo_name: demo-shielding-unshielding-multiworker
           #   host: test-runner-sgx
           #   sgx_mode: HW
+            - test: BestEnergy
+              flavor_id: offchain-worker
+              demo_name: demo-energy-market
           # - test: M8
           #   flavor_id: sidechain
           #   demo_name: demo-direct-call
           #   host: test-runner-sgx
           #   sgx_mode: HW
-          - test: Sidechain
-            flavor_id: sidechain
-            demo_name: demo-sidechain
-            host: ubuntu-latest
-            sgx_mode: SW
+          # - test: Sidechain
+          #   flavor_id: sidechain
+          #   demo_name: demo-sidechain
+          #   host: ubuntu-latest
+          #   sgx_mode: SW
           # - test: M6
           #   flavor_id: offchain-worker
           #   demo_name: demo-shielding-unshielding-multiworker
@@ -546,7 +549,7 @@ jobs:
       #     name: integritee-worker-teeracle-${{ github.ref_name }}.tar.gz
       #     path: .
 
-      - name: Download Sidechain Image
+      - name: Download Worker Image
         uses: actions/download-artifact@v3
         with:
           name: integritee-worker-sidechain-${{ github.ref_name }}.tar.gz
@@ -595,10 +598,7 @@ jobs:
           draft: true
           name: Docker ${{ github.ref_name }}
           files: |
-            integritee-worker-teeracle-${{ github.ref_name }}.tar.gz
             integritee-worker-sidechain-${{ github.ref_name }}.tar.gz
-            sidechain-cli-${{ github.ref_name }}.tar.gz
-            teeracle-cli-${{ github.ref_name }}.tar.gz
             integritee-client
             integritee-demo-validateer
             enclave.signed.so
