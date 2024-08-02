@@ -513,11 +513,11 @@ jobs:
       #     name: integritee-worker-teeracle-${{ github.ref_name }}.tar.gz
       #     path: .
 
-      - name: Download Sidechain Image
-        uses: actions/download-artifact@v3
-        with:
-          name: integritee-worker-sidechain-${{ github.ref_name }}.tar.gz
-          path: .
+      # - name: Download Sidechain Image
+      #   uses: actions/download-artifact@v3
+      #   with:
+      #     name: integritee-worker-sidechain-${{ github.ref_name }}.tar.gz
+      #     path: .
 
       ##
       # Temporary comment out until we decide what to release
