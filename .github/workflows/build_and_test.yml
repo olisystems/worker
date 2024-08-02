@@ -269,13 +269,13 @@ jobs:
           - test: M6
             flavor_id: sidechain
             demo_name: demo-shielding-unshielding-multiworker
-            host: ubuntu-latest
+            host: self-hosted
             sgx_mode: HW
           - test: BestEnergy
             flavor_id: offchain-worker
             demo_name: demo-energy-market
             host: self-hosted
-            sgx_mode: SW
+            sgx_mode: HW
           - test: M8
             flavor_id: sidechain
             demo_name: demo-direct-call
@@ -285,7 +285,7 @@ jobs:
             flavor_id: sidechain
             demo_name: demo-sidechain
             host: ubuntu-latest
-            sgx_mode: SW
+            sgx_mode: HW
           - test: M6
             flavor_id: offchain-worker
             demo_name: demo-shielding-unshielding-multiworker
@@ -431,7 +431,7 @@ jobs:
           docker images --all
 
   release-build:
-    runs-on: ubuntu-latest
+    runs-on: integritee-builder-sgx
     name: Release Build of teeracle
     if: startsWith(github.ref, 'refs/tags/')
     needs: [ build-test, integration-tests ]
