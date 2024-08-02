@@ -309,11 +309,11 @@ jobs:
           fi
           echo "LOG_DIR=./logs-$version" >> $GITHUB_ENV
 
-      - name: Download Worker Image
-        uses: actions/download-artifact@v3
-        with:
-          name: integritee-worker${{ env.IMAGE_SUFFIX }}.tar.gz
-          path: .
+      # - name: Download Worker Image
+      #   uses: actions/download-artifact@v3
+      #   with:
+      #     name: integritee-worker${{ env.IMAGE_SUFFIX }}.tar.gz
+      #     path: .
 
       - name: Download CLI client Image
         uses: actions/download-artifact@v3
