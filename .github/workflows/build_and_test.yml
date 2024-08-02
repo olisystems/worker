@@ -137,13 +137,13 @@ jobs:
             additional_features: dcap
           - flavor_id: teeracle
             mode: teeracle
-            host: integritee-builder-sgx
+            host: ubuntu-latest
             sgx_mode: HW
             additional_features: dcap
           - flavor_id: sidechain-evm
             mode: sidechain
             additional_features: evm,dcap
-            host: integritee-builder-sgx
+            host: ubuntu-latest
             sgx_mode: HW
 
     steps:
@@ -429,7 +429,7 @@ jobs:
           docker images --all
 
   release-build:
-    runs-on: integritee-builder-sgx
+    runs-on: ubuntu-latest
     name: Release Build of teeracle
     if: startsWith(github.ref, 'refs/tags/')
     needs: [ build-test, integration-tests ]
