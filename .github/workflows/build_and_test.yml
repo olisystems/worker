@@ -423,10 +423,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # - flavor_id: teeracle
-          #   mode: teeracle
-          #   sgx_mode: HW
-          #   additional_features: dcap
+          - flavor_id: teeracle
+            mode: teeracle
+            sgx_mode: HW
+            additional_features: dcap
           - flavor_id: sidechain
             mode: sidechain
             sgx_mode: HW
