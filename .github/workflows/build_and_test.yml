@@ -269,11 +269,11 @@ jobs:
           #   demo_name: demo-sidechain
           #   host: ubuntu-latest
           #   sgx_mode: SW
-          # - test: M6
-          #   flavor_id: offchain-worker
-          #   demo_name: demo-shielding-unshielding-multiworker
-          #   host: test-runner-sgx
-          #   sgx_mode: HW
+          - test: M6
+            flavor_id: offchain-worker
+            demo_name: demo-shielding-unshielding-multiworker
+            host: ubuntu-latest
+            sgx_mode: HW
 #          - test: Teeracle
 #            flavor_id: teeracle
 #            demo_name: demo-teeracle
