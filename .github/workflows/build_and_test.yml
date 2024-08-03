@@ -277,7 +277,7 @@ jobs:
             sgx_mode: SW
           - test: BestEnergy
             flavor_id: sidechain
-            #demo_name: demo-energy-market
+            demo_name: demo-energy-market
             host: self-hosted
             sgx_mode: SW
           - test: M8
