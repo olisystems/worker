@@ -273,7 +273,7 @@ jobs:
           - test: M6
             flavor_id: sidechain
             demo_name: demo-shielding-unshielding-multiworker
-            host: self-hosted
+            host: ubuntu-latest
             sgx_mode: HW
           # - test: BestEnergy
           #   flavor_id: sidechain
