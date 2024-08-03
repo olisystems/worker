@@ -275,7 +275,7 @@ jobs:
           - test: M6
             flavor_id: offchain-worker
             #demo_name: demo-shielding-unshielding-multiworker
-            host: self-hosted
+            host: ubuntu-latest
             sgx_mode: SW
           - test: BestEnergy
             flavor_id: sidechain
@@ -285,17 +285,17 @@ jobs:
           - test: M8
             flavor_id: sidechain
             #demo_name: demo-direct-call
-            host: self-hosted
+            host: ubuntu-latest
             sgx_mode: SW
           - test: Sidechain
             flavor_id: sidechain
             #demo_name: demo-sidechain
-            host: self-hosted
+            host: ubuntu-latest
             sgx_mode: SW
           - test: M6
             flavor_id: offchain-worker
             #demo_name: demo-shielding-unshielding-multiworker
-            host: self-hosted
+            host: ubuntu-latest
             sgx_mode: SW
 #          - test: Teeracle
 #            flavor_id: teeracle
@@ -305,17 +305,17 @@ jobs:
           - test: Teeracle
             flavor_id: teeracle
             #demo_name: demo-teeracle-generic
-            host: self-hosted
+            host: ubuntu-latest
             sgx_mode: SW
           - test: Benchmark
             flavor_id: sidechain
             #demo_name: sidechain-benchmark
-            host: self-hosted
+            host: ubuntu-latest
             sgx_mode: SW
           - test: EVM
             flavor_id: sidechain-evm
             #demo_name: demo-smart-contract
-            host: self-hosted
+            host: ubuntu-latest
             sgx_mode: SW
 
     steps:
