@@ -279,7 +279,7 @@ jobs:
           #   sgx_mode: SW
           - test: BestEnergy
             flavor_id: sidechain
-            demo_name: demo-energy-market
+            #demo_name: demo-energy-market
             host: self-hosted
             sgx_mode: HW
           # - test: M8
@@ -392,8 +392,11 @@ jobs:
       - name: Integration Test ${{ matrix.test }}-${{ matrix.flavor_id }}
         run: |
           cd docker
-          docker compose -f <(envsubst < docker-compose.yml) -f <(envsubst < ${{ matrix.demo_name }}.yml) -p ${PROJECT} up ${{ matrix.demo_name }} --no-build --exit-code-from ${{ matrix.demo_name }} --remove-orphans
-
+          if [ -n "${{ matrix.demo_name }}" ]; then
+            docker compose -f <(envsubst < docker-compose.yml) -f <(envsubst < ${{ matrix.demo_name }}.yml) -p ${PROJECT} up ${{ matrix.demo_name }} --no-build --exit-code-from ${{ matrix.demo_name }} --remove-orphans
+          else
+            echo "Demo service is commented out; not running demo."
+          fi
       - name: Collect Docker Logs
         continue-on-error: true
         if: always()
