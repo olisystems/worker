@@ -1,6 +1,6 @@
 services:
   "integritee-node-${VERSION}":
-    image: "${INTEGRITEE_NODE:-integritee/integritee-node:1.1.4}"
+    image: "${INTEGRITEE_NODE:-integritee/integritee-node:1.13.0}"
     hostname: integritee-node
     devices:
       - "${SGX_PROVISION:-/dev/null}:/dev/sgx/provision"
@@ -15,7 +15,7 @@ services:
       interval: 10s
       timeout: 10s
       retries: 6
-    command: -lruntime=info -lteerex=debug --dev --rpc-methods unsafe --ws-external --rpc-external --ws-port 9912
+    command: -lruntime=info -lteerex=debug --dev --rpc-methods unsafe --rpc-external --rpc-port 9912
     #logging:
     #driver: local
   "integritee-worker-1-${VERSION}":
@@ -43,8 +43,7 @@ services:
       interval: 10s
       timeout: 10s
       retries: 25
-    # OLI: added --skip-ra`
-    command: "--clean-reset --data-dir /tmp/worker1 --ws-external -M integritee-worker-1 -T wss://integritee-worker-1 -u ws://integritee-node -U ws://integritee-worker-1 -P 2011 -w 2101 -p 9912 -h 4645 run --dev ${ADDITIONAL_RUNTIME_FLAGS} --skip-ra"
+    command: "--clean-reset --data-dir /tmp/worker1 --ws-external -M integritee-worker-1 -T wss://integritee-worker-1 -u ws://integritee-node -U ws://integritee-worker-1 -P 2011 -w 2101 -p 9912 -h 4645 run --dev ${ADDITIONAL_RUNTIME_FLAGS}"
     restart: "no"
   "integritee-worker-2-${VERSION}":
     image: integritee-worker:${VERSION:-dev}
