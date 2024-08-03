@@ -185,7 +185,7 @@ jobs:
           docker image save integritee-cli-client-${{ env.IMAGE_SUFFIX }} | gzip > integritee-cli-client-${{ env.IMAGE_SUFFIX }}.tar.gz
 
       - name: Upload CLI client image
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: integritee-cli-client-${{ env.IMAGE_SUFFIX }}.tar.gz
           path: integritee-cli-client-${{ env.IMAGE_SUFFIX }}.tar.gz
