@@ -276,7 +276,7 @@ jobs:
             flavor_id: offchain-worker
             #demo_name: demo-shielding-unshielding-multiworker
             host: ubuntu-latest
-            sgx_mode: SW
+            sgx_mode: HW
           - test: BestEnergy
             flavor_id: sidechain
             #demo_name: demo-energy-market
@@ -286,17 +286,17 @@ jobs:
             flavor_id: sidechain
             #demo_name: demo-direct-call
             host: ubuntu-latest
-            sgx_mode: SW
+            sgx_mode: HW
           - test: Sidechain
             flavor_id: sidechain
             #demo_name: demo-sidechain
             host: ubuntu-latest
-            sgx_mode: SW
+            sgx_mode: HW
           - test: M6
             flavor_id: offchain-worker
             #demo_name: demo-shielding-unshielding-multiworker
             host: ubuntu-latest
-            sgx_mode: SW
+            sgx_mode: HW
 #          - test: Teeracle
 #            flavor_id: teeracle
 #            demo_name: demo-teeracle
@@ -306,17 +306,17 @@ jobs:
             flavor_id: teeracle
             #demo_name: demo-teeracle-generic
             host: ubuntu-latest
-            sgx_mode: SW
+            sgx_mode: HW
           - test: Benchmark
             flavor_id: sidechain
             #demo_name: sidechain-benchmark
             host: ubuntu-latest
-            sgx_mode: SW
+            sgx_mode: HW
           - test: EVM
             flavor_id: sidechain-evm
             #demo_name: demo-smart-contract
             host: ubuntu-latest
-            sgx_mode: SW
+            sgx_mode: HW
 
     steps:
       - uses: actions/checkout@v3
