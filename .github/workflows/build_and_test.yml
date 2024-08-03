@@ -35,23 +35,23 @@ jobs:
         include:
           - flavor_id: sidechain
             mode: sidechain
-            host: ubuntu-latest
-            sgx_mode: SW
+            host: integritee-builder-sgx
+            sgx_mode: HW
             additional_features: dcap
           - flavor_id: offchain-worker
             mode: offchain-worker
-            host: ubuntu-latest
+            host: integritee-builder-sgx
             sgx_mode: HW
             additional_features: dcap
           - flavor_id: teeracle
             mode: teeracle
-            host: ubuntu-latest
+            host: integritee-builder-sgx
             sgx_mode: HW
             additional_features: dcap
           - flavor_id: sidechain-evm
             mode: sidechain
             additional_features: evm,dcap
-            host: ubuntu-latest
+            host: integritee-builder-sgx
             sgx_mode: HW
 
     steps:
@@ -127,23 +127,23 @@ jobs:
         include:
           - flavor_id: sidechain
             mode: sidechain
-            host: ubuntu-latest
+            host: integritee-builder-sgx
             sgx_mode: HW
             additional_features: dcap
           - flavor_id: offchain-worker
             mode: offchain-worker
-            host: ubuntu-latest
-            sgx_mode: SW
+            host: integritee-builder-sgx
+            sgx_mode: HW
             additional_features: dcap
           - flavor_id: teeracle
             mode: teeracle
-            host: ubuntu-latest
+            host: integritee-builder-sgx
             sgx_mode: HW
             additional_features: dcap
           - flavor_id: sidechain-evm
             mode: sidechain
             additional_features: evm,dcap
-            host: ubuntu-latest
+            host: integritee-builder-sgx
             sgx_mode: HW
 
     steps:
@@ -261,6 +261,10 @@ jobs:
     env:
       WORKER_IMAGE_TAG: integritee-worker:dev
       CLIENT_IMAGE_TAG: integritee-cli:dev
+      COINMARKETCAP_KEY: ${{ secrets.COINMARKETCAP_KEY }}
+      # IAS_EPID_SPID: ${{ secrets.IAS_SPID }}
+      # IAS_EPID_KEY: ${{ secrets.IAS_PRIMARY_KEY }}
+      TEERACLE_INTERVAL_SECONDS: 10
 
     strategy:
       fail-fast: false
