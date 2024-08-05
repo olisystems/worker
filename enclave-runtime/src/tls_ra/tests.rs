@@ -90,8 +90,7 @@ pub fn test_tls_ra_server_client_networking() {
 	let client_shielding_key = Arc::new(RwLock::new(Vec::new()));
 	let client_state_key = Arc::new(RwLock::new(initial_client_state_key.clone()));
 	let client_state = Arc::new(RwLock::new(initial_client_state.clone()));
-	let client_light_client_state =
-		Arc::new(RwLock::new(initial_client_light_client_state.clone()));
+	let client_light_client_state = Arc::new(RwLock::new(initial_client_light_client_state));
 
 	let client_seal_handler = SealHandlerMock::new(
 		client_shielding_key.clone(),
@@ -118,7 +117,7 @@ pub fn test_tls_ra_server_client_networking() {
 		Some(&QUOTE_SIZE),
 		shard,
 		SKIP_RA,
-		client_seal_handler.clone(),
+		client_seal_handler,
 		client_account,
 	);
 
@@ -129,13 +128,14 @@ pub fn test_tls_ra_server_client_networking() {
 	assert_eq!(*client_shielding_key.read().unwrap(), shielding_key_encoded);
 	assert_eq!(*client_light_client_state.read().unwrap(), light_client_state_encoded);
 
-	// State and state-key are provisioned only in sidechain mode
-	if WorkerModeProvider::worker_mode() == WorkerMode::Sidechain {
-		assert_eq!(*client_state.read().unwrap(), state_encoded);
-		assert_eq!(*client_state_key.read().unwrap(), state_key_encoded);
-	} else {
+	// State and state-key are provisioned only in sidechain or OCW mode
+	if WorkerModeProvider::worker_mode() == WorkerMode::Teeracle {
 		assert_eq!(*client_state.read().unwrap(), initial_client_state);
 		assert_eq!(*client_state_key.read().unwrap(), initial_client_state_key);
+	} else {
+		// Sidechain or OffchainWorker
+		assert_eq!(*client_state.read().unwrap(), state_encoded);
+		assert_eq!(*client_state_key.read().unwrap(), state_key_encoded);
 	}
 }
 

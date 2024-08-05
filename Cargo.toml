@@ -1,7 +1,8 @@
 [workspace]
-
+resolver = "2"
 members = [
     "app-libs/oracle",
+    "app-libs/parentchain-interface",
     "app-libs/sgx-runtime",
     "app-libs/stf",
     "cli",
@@ -82,10 +83,8 @@ sgx_types = { version = "1.1.6", git = "https://github.com/apache/incubator-teac
 sgx_ucrypto = { version = "1.1.6", git = "https://github.com/apache/incubator-teaclave-sgx-sdk", branch = "master" }
 sgx_urts = { version = "1.1.6", git = "https://github.com/apache/incubator-teaclave-sgx-sdk", branch = "master" }
 
-#[patch."https://github.com/integritee-network/sgx-runtime"]
-#sgx-runtime = { path = "../sgx-runtime/runtime"}
-#sp-io = { path = "../sgx-runtime/substrate-sgx/sp-io"}
-#sgx-externalities = { path = "../sgx-runtime/substrate-sgx/externalities"}
+[patch.crates-io]
+ring = { git = "https://github.com/betrusted-io/ring-xous", branch = "0.16.20-cleanup" }
 
 #[patch."https://github.com/integritee-network/integritee-node"]
 #my-node-runtime = { package = "integritee-node-runtime", git = "https://github.com/integritee-network//integritee-node", branch = "ab/integrate-pallet-teerex-refactoring" }
@@ -95,18 +94,16 @@ sgx_urts = { version = "1.1.6", git = "https://github.com/apache/incubator-teacl
 #substrate-client-keystore = { path = "../../scs/substrate-api-client/client-keystore" }
 
 #[patch."https://github.com/integritee-network/pallets.git"]
-#pallet-claims = { git = "https://github.com/integritee-network//pallets", branch = "ab/shard-config-upgradability-2" }
-#pallet-enclave-bridge = { git = "https://github.com/integritee-network//pallets", branch = "ab/shard-config-upgradability-2" }
-#pallet-teerex = { git = "https://github.com/integritee-network//pallets", branch = "ab/shard-config-upgradability-2" }
-#pallet-sidechain = { git = "https://github.com/integritee-network//pallets", branch = "ab/shard-config-upgradability-2" }
-#sgx-verify = { git = "https://github.com/integritee-network//pallets", branch = "ab/shard-config-upgradability-2" }
-#pallet-teeracle = { git = "https://github.com/integritee-network//pallets", branch = "ab/shard-config-upgradability-2" }
-#test-utils = { git = "https://github.com/integritee-network//pallets", branch = "ab/shard-config-upgradability-2" }
-#claims-primitives = { git = "https://github.com/integritee-network//pallets", branch = "ab/shard-config-upgradability-2" }
-#enclave-bridge-primitives = { git = "https://github.com/integritee-network//pallets", branch = "ab/shard-config-upgradability-2" }
-#teerex-primitives = { git = "https://github.com/integritee-network//pallets", branch = "ab/shard-config-upgradability-2" }
-#teeracle-primitives = { git = "https://github.com/integritee-network//pallets", branch = "ab/shard-config-upgradability-2" }
-#common-primitives = { git = "https://github.com/integritee-network//pallets", branch = "ab/shard-config-upgradability-2" }
-
-#[patch."https://github.com/integritee-network/http_req"]
-#http_req = {path = '..//http_req' }
+#pallet-claims = { git = "https://github.com/integritee-network//pallets", branch = "ab/parentchian-set-timestamp" }
+#pallet-enclave-bridge = { git = "https://github.com/integritee-network//pallets", branch = "ab/parentchian-set-timestamp" }
+#pallet-teerex = { git = "https://github.com/integritee-network//pallets", branch = "ab/parentchian-set-timestamp" }
+#pallet-sidechain = { git = "https://github.com/integritee-network//pallets", branch = "ab/parentchian-set-timestamp" }
+#pallet-parentchain = { git = "https://github.com/integritee-network//pallets", branch = "ab/parentchian-set-timestamp" }
+#sgx-verify = { git = "https://github.com/integritee-network//pallets", branch = "ab/parentchian-set-timestamp" }
+#pallet-teeracle = { git = "https://github.com/integritee-network//pallets", branch = "ab/parentchian-set-timestamp" }
+#test-utils = { git = "https://github.com/integritee-network//pallets", branch = "ab/parentchian-set-timestamp" }
+#claims-primitives = { git = "https://github.com/integritee-network//pallets", branch = "ab/parentchian-set-timestamp" }
+#enclave-bridge-primitives = { git = "https://github.com/integritee-network//pallets", branch = "ab/parentchian-set-timestamp" }
+#teerex-primitives = { git = "https://github.com/integritee-network//pallets", branch = "ab/parentchian-set-timestamp" }
+#teeracle-primitives = { git = "https://github.com/integritee-network//pallets", branch = "ab/parentchian-set-timestamp" }
+#common-primitives = { git = "https://github.com/integritee-network//pallets", branch = "ab/parentchian-set-timestamp" }

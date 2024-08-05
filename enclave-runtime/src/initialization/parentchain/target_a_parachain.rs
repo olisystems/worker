@@ -31,18 +31,19 @@ use crate::{
 			GLOBAL_TARGET_A_PARENTCHAIN_LIGHT_CLIENT_SEAL, GLOBAL_TARGET_A_PARENTCHAIN_NONCE_CACHE,
 		},
 		parentchain::common::{
-			create_extrinsics_factory, create_target_a_offchain_immediate_import_dispatcher,
+			create_extrinsics_factory, create_sidechain_triggered_import_dispatcher_for_target_a,
+			create_target_a_offchain_immediate_import_dispatcher,
 			create_target_a_parentchain_block_importer,
 		},
 	},
 };
 use itc_parentchain::light_client::{concurrent_access::ValidatorAccess, LightClientState};
+pub use itc_parentchain::primitives::{ParachainBlock, ParachainHeader, ParachainParams};
 use itp_component_container::ComponentGetter;
 use itp_settings::worker_mode::{ProvideWorkerMode, WorkerMode};
+use itp_stf_interface::ShardCreationInfo;
 use itp_types::parentchain::ParentchainId;
 use std::{path::PathBuf, sync::Arc};
-
-pub use itc_parentchain::primitives::{ParachainBlock, ParachainHeader, ParachainParams};
 
 #[derive(Clone)]
 pub struct TargetAParachainHandler {
@@ -58,6 +59,7 @@ impl TargetAParachainHandler {
 	pub fn init<WorkerModeProvider: ProvideWorkerMode>(
 		_base_path: PathBuf,
 		params: ParachainParams,
+		shard_creation_info: ShardCreationInfo,
 	) -> Result<Self> {
 		let ocall_api = GLOBAL_OCALL_API_COMPONENT.get()?;
 		let state_handler = GLOBAL_STATE_HANDLER_COMPONENT.get()?;
@@ -93,6 +95,7 @@ impl TargetAParachainHandler {
 			stf_executor.clone(),
 			extrinsics_factory.clone(),
 			node_metadata_repository.clone(),
+			shard_creation_info,
 		)?;
 
 		let import_dispatcher = match WorkerModeProvider::worker_mode() {
@@ -103,7 +106,7 @@ impl TargetAParachainHandler {
 				extrinsics_factory.clone(),
 			)?,
 			WorkerMode::Sidechain =>
-				unimplemented!("Can't run target a chain in sidechain mode yet."),
+				create_sidechain_triggered_import_dispatcher_for_target_a(block_importer),
 			WorkerMode::Teeracle =>
 				Arc::new(TargetAParentchainBlockImportDispatcher::new_empty_dispatcher()),
 		};

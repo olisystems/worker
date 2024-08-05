@@ -25,7 +25,7 @@ use itp_node_api::metadata::{provider::AccessNodeMetadata, NodeMetadataTrait};
 use itp_ocall_api::{EnclaveAttestationOCallApi, EnclaveOnChainOCallApi};
 use itp_sgx_externalities::{SgxExternalitiesTrait, StateHash};
 use itp_stf_interface::{
-	parentchain_pallet::ParentchainPalletInterface, StateCallInterface, UpdateState,
+	parentchain_pallet::ParentchainPalletInstancesInterface, StateCallInterface, UpdateState,
 };
 use itp_stf_primitives::{
 	traits::TrustedCallVerification,
@@ -34,9 +34,9 @@ use itp_stf_primitives::{
 use itp_stf_state_handler::{handle_state::HandleState, query_shard_state::QueryShardState};
 use itp_time_utils::duration_now;
 use itp_types::{
-	parentchain::{Header as ParentchainHeader, ParentchainId},
+	parentchain::{Header as ParentchainHeader, ParentchainCall, ParentchainId},
 	storage::StorageEntryVerified,
-	OpaqueCall, H256,
+	H256,
 };
 use log::*;
 use sp_runtime::traits::Header as HeaderTrait;
@@ -44,6 +44,7 @@ use std::{
 	collections::BTreeMap, fmt::Debug, marker::PhantomData, sync::Arc, time::Duration, vec,
 	vec::Vec,
 };
+
 pub struct StfExecutor<OCallApi, StateHandler, NodeMetadataRepository, Stf, TCS, G>
 where
 	TCS: PartialEq + Encode + Decode + Debug + Clone + Send + Sync + TrustedCallVerification,
@@ -117,7 +118,7 @@ where
 		}
 
 		debug!("execute on STF, call with nonce {}", trusted_call.nonce());
-		let mut extrinsic_call_backs: Vec<OpaqueCall> = Vec::new();
+		let mut extrinsic_call_backs: Vec<ParentchainCall> = Vec::new();
 		if let Err(e) = Stf::execute_call(
 			state,
 			trusted_call.clone(),
@@ -136,7 +137,20 @@ where
 		}
 
 		for call in extrinsic_call_backs.clone() {
-			trace!("trusted_call wants to send encoded call: 0x{}", hex::encode(call.encode()));
+			match call {
+				ParentchainCall::Integritee(opaque_call) => trace!(
+					"trusted_call wants to send encoded call to [Integritee] parentchain: 0x{}",
+					hex::encode(opaque_call.encode())
+				),
+				ParentchainCall::TargetA(opaque_call) => trace!(
+					"trusted_call wants to send encoded call to [TargetA] parentchain: 0x{}",
+					hex::encode(opaque_call.encode())
+				),
+				ParentchainCall::TargetB(opaque_call) => trace!(
+					"trusted_call wants to send encoded call to [TargetB] parentchain: 0x{}",
+					hex::encode(opaque_call.encode())
+				),
+			}
 		}
 		Ok(ExecutedOperation::success(operation_hash, top_or_hash, extrinsic_call_backs))
 	}
@@ -153,10 +167,11 @@ where
 	Stf: UpdateState<
 			StateHandler::StateT,
 			<StateHandler::StateT as SgxExternalitiesTrait>::SgxExternalitiesDiffType,
-		> + ParentchainPalletInterface<StateHandler::StateT, ParentchainHeader>,
+		> + ParentchainPalletInstancesInterface<StateHandler::StateT, ParentchainHeader>,
 	<StateHandler::StateT as SgxExternalitiesTrait>::SgxExternalitiesDiffType:
 		IntoIterator<Item = (Vec<u8>, Option<Vec<u8>>)>,
-	<Stf as ParentchainPalletInterface<StateHandler::StateT, ParentchainHeader>>::Error: Debug,
+	<Stf as ParentchainPalletInstancesInterface<StateHandler::StateT, ParentchainHeader>>::Error:
+		Debug,
 	<StateHandler::StateT as SgxExternalitiesTrait>::SgxExternalitiesDiffType:
 		From<BTreeMap<Vec<u8>, Option<Vec<u8>>>>,
 	TCS: PartialEq + Encode + Decode + Debug + Clone + Send + Sync + TrustedCallVerification,
@@ -170,10 +185,6 @@ where
 		debug!("Update STF storage upon block import!");
 		let storage_hashes = Stf::storage_hashes_to_update_on_block(parentchain_id);
 
-		if storage_hashes.is_empty() {
-			return Ok(())
-		}
-
 		// global requests they are the same for every shard
 		let state_diff_update = self
 			.ocall_api
@@ -186,7 +197,7 @@ where
 		let shards = self.state_handler.list_shards()?;
 		for shard_id in shards {
 			let (state_lock, mut state) = self.state_handler.load_for_mutation(&shard_id)?;
-			match Stf::update_parentchain_block(&mut state, header.clone()) {
+			match Stf::update_parentchain_integritee_block(&mut state, header.clone()) {
 				Ok(_) => {
 					self.state_handler.write_after_mutation(state, state_lock, &shard_id)?;
 				},
@@ -215,12 +226,13 @@ impl<OCallApi, StateHandler, NodeMetadataRepository, Stf, TCS, G>
 where
 	<StateHandler::StateT as SgxExternalitiesTrait>::SgxExternalitiesDiffType:
 		From<BTreeMap<Vec<u8>, Option<Vec<u8>>>> + IntoIterator<Item = (Vec<u8>, Option<Vec<u8>>)>,
-	<Stf as ParentchainPalletInterface<StateHandler::StateT, ParentchainHeader>>::Error: Debug,
+	<Stf as ParentchainPalletInstancesInterface<StateHandler::StateT, ParentchainHeader>>::Error:
+		Debug,
 	NodeMetadataRepository: AccessNodeMetadata,
 	OCallApi: EnclaveAttestationOCallApi + EnclaveOnChainOCallApi,
 	StateHandler: HandleState<HashType = H256> + QueryShardState,
 	StateHandler::StateT: Encode + SgxExternalitiesTrait,
-	Stf: ParentchainPalletInterface<StateHandler::StateT, ParentchainHeader>
+	Stf: ParentchainPalletInstancesInterface<StateHandler::StateT, ParentchainHeader>
 		+ UpdateState<
 			StateHandler::StateT,
 			<StateHandler::StateT as SgxExternalitiesTrait>::SgxExternalitiesDiffType,
@@ -253,7 +265,7 @@ where
 
 			Stf::apply_state_diff(&mut state, per_shard_update.into());
 			Stf::apply_state_diff(&mut state, state_diff_update.clone().into());
-			if let Err(e) = Stf::update_parentchain_block(&mut state, header.clone()) {
+			if let Err(e) = Stf::update_parentchain_integritee_block(&mut state, header.clone()) {
 				error!("Could not update parentchain block. {:?}: {:?}", shard_id, e)
 			}
 

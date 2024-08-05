@@ -1,11 +1,11 @@
-use crate::{MerkleProofWithCodec, StfError, String};
+use crate::MerkleProofWithCodec;
 use binary_merkle_tree::merkle_proof;
 use codec::Encode;
 use itp_stf_primitives::error::StfError;
 use simplyr_lib::{MarketOutput, Order};
 use sp_core::H256;
 use sp_runtime::traits::Keccak256;
-use std::{format, fs, vec::Vec};
+use std::{format, fs, string::String, vec::Vec};
 
 pub static ORDERS_DIR: &str = "./records/orders";
 pub static RESULTS_DIR: &str = "./records/market_results";

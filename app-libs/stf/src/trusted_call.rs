@@ -24,7 +24,7 @@ use std::vec::Vec;
 #[cfg(feature = "evm")]
 use crate::evm_helpers::{create_code_hash, evm_create2_address, evm_create_address};
 use crate::{
-	helpers::{ensure_enclave_signer_account, get_storage_by_key_hash},
+	helpers::{enclave_signer_account, ensure_enclave_signer_account, shard_vault},
 	Getter,
 };
 use codec::{Compact, Decode, Encode};
@@ -32,19 +32,25 @@ use frame_support::{ensure, traits::UnfilteredDispatchable};
 #[cfg(feature = "evm")]
 use ita_sgx_runtime::{AddressMapping, HashedAddressMapping};
 pub use ita_sgx_runtime::{Balance, Index};
-use ita_sgx_runtime::{Runtime, System};
+use ita_sgx_runtime::{
+	ParentchainInstanceIntegritee, ParentchainInstanceTargetA, ParentchainInstanceTargetB,
+	ParentchainIntegritee, Runtime, System,
+};
 use itp_node_api::metadata::{provider::AccessNodeMetadata, NodeMetadataTrait};
 use itp_node_api_metadata::{
 	pallet_balances::BalancesCallIndexes, pallet_enclave_bridge::EnclaveBridgeCallIndexes,
 	pallet_proxy::ProxyCallIndexes,
 };
-use itp_stf_interface::{ExecuteCall, SHARD_VAULT_KEY};
+use itp_stf_interface::ExecuteCall;
 use itp_stf_primitives::{
 	error::StfError,
 	traits::{TrustedCallSigning, TrustedCallVerification},
 	types::{AccountId, KeyPair, ShardIdentifier, Signature, TrustedOperation},
 };
-use itp_types::{parentchain::ProxyType, Address, OpaqueCall};
+use itp_types::{
+	parentchain::{ParentchainCall, ParentchainId, ProxyType},
+	Address, Moment, OpaqueCall,
+};
 use itp_utils::stringify::account_id_to_string;
 use log::*;
 use sp_core::{
@@ -72,8 +78,9 @@ pub enum TrustedCall {
 	balance_set_balance(AccountId, AccountId, Balance, Balance),
 	balance_transfer(AccountId, AccountId, Balance),
 	balance_unshield(AccountId, AccountId, Balance, ShardIdentifier), // (AccountIncognito, BeneficiaryPublicAccount, Amount, Shard)
-	balance_shield(AccountId, AccountId, Balance), // (Root, AccountIncognito, Amount)
+	balance_shield(AccountId, AccountId, Balance, ParentchainId), // (Root, AccountIncognito, Amount, origin parentchain)
 	pay_as_bid(AccountId, OrdersString),
+	timestamp_set(AccountId, Moment, ParentchainId), // (Root, now)
 	#[cfg(feature = "evm")]
 	evm_withdraw(AccountId, H160, Balance), // (Origin, Address EVM Account, Value)
 	// (Origin, Source, Target, Input, Value, Gas limit, Max fee per gas, Max priority fee per gas, Nonce, Access list)
@@ -128,6 +135,7 @@ impl TrustedCall {
 			Self::balance_unshield(sender_account, ..) => sender_account,
 			Self::balance_shield(sender_account, ..) => sender_account,
 			Self::pay_as_bid(sender_account, _orders_string) => sender_account,
+			Self::timestamp_set(sender_account, ..) => sender_account,
 			#[cfg(feature = "evm")]
 			Self::evm_withdraw(sender_account, ..) => sender_account,
 			#[cfg(feature = "evm")]
@@ -226,7 +234,7 @@ where
 
 	fn execute(
 		self,
-		calls: &mut Vec<OpaqueCall>,
+		calls: &mut Vec<ParentchainCall>,
 		node_metadata_repo: Arc<NodeMetadataRepository>,
 	) -> Result<(), Self::Error> {
 		let sender = self.call.sender_account().clone();
@@ -271,12 +279,26 @@ where
 			},
 			TrustedCall::balance_transfer(from, to, value) => {
 				let origin = ita_sgx_runtime::RuntimeOrigin::signed(from.clone());
-				debug!(
-					"balance_transfer({}, {}, {})",
+				std::println!("⣿STF⣿ 🔄 balance_transfer from ⣿⣿⣿ to ⣿⣿⣿ amount ⣿⣿⣿");
+				// endow fee to enclave (self)
+				let fee_recipient: AccountId = enclave_signer_account();
+				// fixme: apply fees through standard frame process and tune it
+				let fee = crate::STF_TX_FEE;
+				info!(
+					"from {}, to {}, amount {}, fee {}",
 					account_id_to_string(&from),
 					account_id_to_string(&to),
-					value
+					value,
+					fee
 				);
+				ita_sgx_runtime::BalancesCall::<Runtime>::transfer {
+					dest: MultiAddress::Id(fee_recipient),
+					value: fee,
+				}
+				.dispatch_bypass_filter(origin.clone())
+				.map_err(|e| {
+					Self::Error::Dispatch(format!("Balance Transfer error: {:?}", e.error))
+				})?;
 				ita_sgx_runtime::BalancesCall::<Runtime>::transfer {
 					dest: MultiAddress::Id(to),
 					value,
@@ -288,33 +310,40 @@ where
 				Ok(())
 			},
 			TrustedCall::balance_unshield(account_incognito, beneficiary, value, shard) => {
-				debug!(
-					"balance_unshield({}, {}, {}, {})",
+				std::println!(
+					"⣿STF⣿ 🛡👐 balance_unshield from ⣿⣿⣿ to {}, amount {}",
+					account_id_to_string(&beneficiary),
+					value
+				);
+				// endow fee to enclave (self)
+				let fee_recipient: AccountId = enclave_signer_account();
+				// fixme: apply fees through standard frame process and tune it. has to be at least two L1 transfer's fees
+				let fee = crate::STF_TX_FEE * 3;
+
+				info!(
+					"balance_unshield(from (L2): {}, to (L1): {}, amount {} (+fee: {}), shard {})",
 					account_id_to_string(&account_incognito),
 					account_id_to_string(&beneficiary),
 					value,
+					fee,
 					shard
 				);
-				unshield_funds(account_incognito, value)?;
 
-				calls.push(OpaqueCall::from_tuple(&(
-					node_metadata_repo
-						.get_from_metadata(|m| m.unshield_funds_call_indexes())
-						.map_err(|_| StfError::InvalidMetadata)?
-						.map_err(|_| StfError::InvalidMetadata)?,
-					shard,
-					beneficiary.clone(),
-					value,
-					call_hash,
-				)));
-				// todo: the following is a placeholder dummy which will replace the above with #1257.
-				// the extrinsic will be sent and potentially deplete the vault at the current state which
-				// is nothing to worry about before we solve mentioned issue.
-				let vault_pubkey: [u8; 32] = get_storage_by_key_hash(SHARD_VAULT_KEY.into())
-					.ok_or_else(|| {
-						StfError::Dispatch("shard vault key hasn't been set".to_string())
-					})?;
-				let vault_address = Address::from(AccountId::from(vault_pubkey));
+				let origin = ita_sgx_runtime::RuntimeOrigin::signed(account_incognito.clone());
+				ita_sgx_runtime::BalancesCall::<Runtime>::transfer {
+					dest: MultiAddress::Id(fee_recipient),
+					value: fee,
+				}
+				.dispatch_bypass_filter(origin)
+				.map_err(|e| {
+					Self::Error::Dispatch(format!("Balance Unshielding error: {:?}", e.error))
+				})?;
+				burn_funds(account_incognito, value)?;
+
+				let (vault, parentchain_id) = shard_vault().ok_or_else(|| {
+					StfError::Dispatch("shard vault key hasn't been set".to_string())
+				})?;
+				let vault_address = Address::from(vault);
 				let vault_transfer_call = OpaqueCall::from_tuple(&(
 					node_metadata_repo
 						.get_from_metadata(|m| m.transfer_keep_alive_call_indexes())
@@ -332,16 +361,33 @@ where
 					None::<ProxyType>,
 					vault_transfer_call,
 				));
-				calls.push(proxy_call);
+				let parentchain_call = match parentchain_id {
+					ParentchainId::Integritee => ParentchainCall::Integritee(proxy_call),
+					ParentchainId::TargetA => ParentchainCall::TargetA(proxy_call),
+					ParentchainId::TargetB => ParentchainCall::TargetB(proxy_call),
+				};
+				calls.push(parentchain_call);
 				Ok(())
 			},
-			TrustedCall::balance_shield(enclave_account, who, value) => {
+			TrustedCall::balance_shield(enclave_account, who, value, parentchain_id) => {
 				ensure_enclave_signer_account(&enclave_account)?;
-				debug!("balance_shield({}, {})", account_id_to_string(&who), value);
+				debug!(
+					"balance_shield({}, {}, {:?})",
+					account_id_to_string(&who),
+					value,
+					parentchain_id
+				);
+				let (_vault_account, vault_parentchain_id) =
+					shard_vault().ok_or(StfError::NoShardVaultAssigned)?;
+				ensure!(
+					parentchain_id == vault_parentchain_id,
+					StfError::WrongParentchainIdForShardVault
+				);
+				std::println!("⣿STF⣿ 🛡 will shield to {}", account_id_to_string(&who));
 				shield_funds(who, value)?;
 
 				// Send proof of execution on chain.
-				calls.push(OpaqueCall::from_tuple(&(
+				calls.push(ParentchainCall::Integritee(OpaqueCall::from_tuple(&(
 					node_metadata_repo
 						.get_from_metadata(|m| m.publish_hash_call_indexes())
 						.map_err(|_| StfError::InvalidMetadata)?
@@ -349,7 +395,7 @@ where
 					call_hash,
 					Vec::<itp_types::H256>::new(),
 					b"shielded some funds!".to_vec(),
-				)));
+				))));
 				Ok(())
 			},
 
@@ -405,7 +451,7 @@ where
 
 				// Send proof of execution on chain.
 				// calls is in the scope from the outside
-				calls.push(OpaqueCall::from_tuple(&(
+				calls.push(ParentchainCall::Integritee(OpaqueCall::from_tuple(&(
 					node_metadata_repo
 						.get_from_metadata(|m| m.publish_hash_call_indexes())
 						.map_err(|_| StfError::InvalidMetadata)?
@@ -413,8 +459,64 @@ where
 					order_merkle_root,
 					Vec::<itp_types::H256>::new(), // you can ignore this for now. Clients could subscribe to the hashes here to be notified when a new hash is published.
 					b"Published merkle root of an order!".to_vec(),
-				)));
+				))));
 
+				Ok(())
+			},
+
+			TrustedCall::timestamp_set(enclave_account, now, parentchain_id) => {
+				ensure_enclave_signer_account(&enclave_account)?;
+				debug!("timestamp_set({}, {:?})", now, parentchain_id);
+				match parentchain_id {
+					ParentchainId::Integritee => {
+						if ParentchainIntegritee::creation_timestamp().is_none() {
+							debug!(
+								"initializing creation timestamp({}, {:?})",
+								now, parentchain_id
+							);
+							ita_sgx_runtime::ParentchainPalletCall::<
+								Runtime,
+								ParentchainInstanceIntegritee,
+							>::set_creation_timestamp {
+								creation: now,
+							}
+							.dispatch_bypass_filter(ita_sgx_runtime::RuntimeOrigin::root())
+							.map_err(|e| {
+								Self::Error::Dispatch(format!("Timestamp Set error: {:?}", e.error))
+							})?;
+						};
+						ita_sgx_runtime::ParentchainPalletCall::<
+							Runtime,
+							ParentchainInstanceIntegritee,
+						>::set_now {
+							now,
+						}
+						.dispatch_bypass_filter(ita_sgx_runtime::RuntimeOrigin::root())
+						.map_err(|e| {
+							Self::Error::Dispatch(format!("Timestamp Set error: {:?}", e.error))
+						})?
+					},
+					ParentchainId::TargetA => ita_sgx_runtime::ParentchainPalletCall::<
+						Runtime,
+						ParentchainInstanceTargetA,
+					>::set_now {
+						now,
+					}
+					.dispatch_bypass_filter(ita_sgx_runtime::RuntimeOrigin::root())
+					.map_err(|e| {
+						Self::Error::Dispatch(format!("Timestamp Set error: {:?}", e.error))
+					})?,
+					ParentchainId::TargetB => ita_sgx_runtime::ParentchainPalletCall::<
+						Runtime,
+						ParentchainInstanceTargetB,
+					>::set_now {
+						now,
+					}
+					.dispatch_bypass_filter(ita_sgx_runtime::RuntimeOrigin::root())
+					.map_err(|e| {
+						Self::Error::Dispatch(format!("Timestamp Set error: {:?}", e.error))
+					})?,
+				};
 				Ok(())
 			},
 
@@ -542,12 +644,13 @@ where
 	fn get_storage_hashes_to_update(self) -> Vec<Vec<u8>> {
 		let key_hashes = Vec::new();
 		match self.call {
-			TrustedCall::noop(_) => debug!("No storage updates needed..."),
-			TrustedCall::balance_set_balance(_, _, _, _) => debug!("No storage updates needed..."),
-			TrustedCall::balance_transfer(_, _, _) => debug!("No storage updates needed..."),
-			TrustedCall::balance_unshield(_, _, _, _) => debug!("No storage updates needed..."),
-			TrustedCall::balance_shield(_, _, _) => debug!("No storage updates needed..."),
 			TrustedCall::pay_as_bid(_, _) => debug!("No storage updates needed..."),
+			TrustedCall::noop(..) => debug!("No storage updates needed..."),
+			TrustedCall::balance_set_balance(..) => debug!("No storage updates needed..."),
+			TrustedCall::balance_transfer(..) => debug!("No storage updates needed..."),
+			TrustedCall::balance_unshield(..) => debug!("No storage updates needed..."),
+			TrustedCall::balance_shield(..) => debug!("No storage updates needed..."),
+			TrustedCall::timestamp_set(..) => debug!("No storage updates needed..."),
 			#[cfg(feature = "evm")]
 			_ => debug!("No storage updates needed..."),
 		};
@@ -555,7 +658,7 @@ where
 	}
 }
 
-fn unshield_funds(account: AccountId, amount: u128) -> Result<(), StfError> {
+fn burn_funds(account: AccountId, amount: u128) -> Result<(), StfError> {
 	let account_info = System::account(&account);
 	if account_info.data.free < amount {
 		return Err(StfError::MissingFunds)
@@ -566,15 +669,30 @@ fn unshield_funds(account: AccountId, amount: u128) -> Result<(), StfError> {
 		new_free: account_info.data.free - amount,
 	}
 	.dispatch_bypass_filter(ita_sgx_runtime::RuntimeOrigin::root())
-	.map_err(|e| StfError::Dispatch(format!("Unshield funds error: {:?}", e.error)))?;
+	.map_err(|e| StfError::Dispatch(format!("Burn funds error: {:?}", e.error)))?;
 	Ok(())
 }
 
 fn shield_funds(account: AccountId, amount: u128) -> Result<(), StfError> {
+	//fixme: make fee configurable and send fee to vault account on L2
+	let fee = amount / 571; // approx 0.175%
+
+	// endow fee to enclave (self)
+	let fee_recipient: AccountId = enclave_signer_account();
+
+	let account_info = System::account(&fee_recipient);
+	ita_sgx_runtime::BalancesCall::<Runtime>::force_set_balance {
+		who: MultiAddress::Id(fee_recipient),
+		new_free: account_info.data.free + fee,
+	}
+	.dispatch_bypass_filter(ita_sgx_runtime::RuntimeOrigin::root())
+	.map_err(|e| StfError::Dispatch(format!("Shield funds error: {:?}", e.error)))?;
+
+	// endow shieding amount - fee to beneficiary
 	let account_info = System::account(&account);
 	ita_sgx_runtime::BalancesCall::<Runtime>::force_set_balance {
 		who: MultiAddress::Id(account),
-		new_free: account_info.data.free + amount,
+		new_free: account_info.data.free + amount - fee,
 	}
 	.dispatch_bypass_filter(ita_sgx_runtime::RuntimeOrigin::root())
 	.map_err(|e| StfError::Dispatch(format!("Shield funds error: {:?}", e.error)))?;

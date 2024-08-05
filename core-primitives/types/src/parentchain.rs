@@ -15,12 +15,19 @@
 
 */
 
-//! Parentchain specific params. Be sure to change them if your node uses different types.
-
+use crate::{OpaqueCall, PalletString, ShardIdentifier};
+use alloc::{format, vec::Vec};
 use codec::{Decode, Encode};
+use core::fmt::Debug;
+use itp_stf_primitives::traits::{IndirectExecutor, TrustedCallVerification};
+use itp_utils::stringify::account_id_to_string;
+#[cfg(feature = "std")]
+use serde::{Deserialize, Serialize};
+use sp_core::bounded::alloc;
 use sp_runtime::{generic::Header as HeaderG, traits::BlakeTwo256, MultiAddress, MultiSignature};
-use sp_std::vec::Vec;
-
+use substrate_api_client::ac_node_api::StaticEvent;
+use teeracle_primitives::ExchangeRate;
+use teerex_primitives::{SgxAttestationMethod, SgxStatus};
 pub type StorageProof = Vec<Vec<u8>>;
 
 // Basic Types.
@@ -52,6 +59,7 @@ pub type BlockHash = sp_core::H256;
 pub type Signature = MultiSignature;
 
 #[derive(Encode, Decode, Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum ParentchainId {
 	/// The Integritee Parentchain, the trust root of the enclave and serving finality to sidechains.
 	Integritee,
@@ -61,6 +69,249 @@ pub enum ParentchainId {
 	TargetB,
 }
 
+#[cfg(feature = "std")]
+impl std::fmt::Display for ParentchainId {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		let message = match self {
+			ParentchainId::Integritee => "Integritee",
+			ParentchainId::TargetA => "TargetA",
+			ParentchainId::TargetB => "TargetB",
+		};
+		write!(f, "{}", message)
+	}
+}
+
 pub trait IdentifyParentchain {
 	fn parentchain_id(&self) -> ParentchainId;
+}
+
+pub trait FilterEvents {
+	type Error: From<ParentchainError> + core::fmt::Debug;
+	fn get_extrinsic_statuses(&self) -> core::result::Result<Vec<ExtrinsicStatus>, Self::Error>;
+
+	fn get_transfer_events(&self) -> core::result::Result<Vec<BalanceTransfer>, Self::Error>;
+}
+
+#[derive(Encode, Decode, Debug)]
+pub struct ExtrinsicSuccess;
+
+impl StaticEvent for ExtrinsicSuccess {
+	const PALLET: &'static str = "System";
+	const EVENT: &'static str = "ExtrinsicSuccess";
+}
+
+#[derive(Encode, Decode)]
+pub struct ExtrinsicFailed;
+
+impl StaticEvent for ExtrinsicFailed {
+	const PALLET: &'static str = "System";
+	const EVENT: &'static str = "ExtrinsicFailed";
+}
+
+#[derive(Debug)]
+pub enum ExtrinsicStatus {
+	Success,
+	Failed,
+}
+
+#[derive(Encode, Decode, Debug)]
+pub struct BalanceTransfer {
+	pub from: AccountId,
+	pub to: AccountId,
+	pub amount: Balance,
+}
+
+impl core::fmt::Display for BalanceTransfer {
+	fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+		let message = format!(
+			"BalanceTransfer :: from: {}, to: {}, amount: {}",
+			account_id_to_string::<AccountId>(&self.from),
+			account_id_to_string::<AccountId>(&self.to),
+			self.amount
+		);
+		write!(f, "{}", message)
+	}
+}
+
+impl StaticEvent for BalanceTransfer {
+	const PALLET: &'static str = "Balances";
+	const EVENT: &'static str = "Transfer";
+}
+
+#[derive(Encode, Decode, Debug)]
+pub struct AddedSgxEnclave {
+	pub registered_by: AccountId,
+	pub worker_url: Option<PalletString>,
+	pub tcb_status: Option<SgxStatus>,
+	pub attestation_method: SgxAttestationMethod,
+}
+
+impl core::fmt::Display for crate::parentchain::AddedSgxEnclave {
+	fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+		let message = format!(
+			"AddedSgxEnclave :: from: {}, url: {:?}, status: {:?}, method: {:?}",
+			account_id_to_string::<AccountId>(&self.registered_by),
+			self.worker_url,
+			self.tcb_status,
+			self.attestation_method
+		);
+		write!(f, "{}", message)
+	}
+}
+
+impl StaticEvent for crate::parentchain::ProcessedParentchainBlock {
+	const PALLET: &'static str = "EnclaveBridge";
+	const EVENT: &'static str = "ProcessedParentchainBlock";
+}
+
+#[derive(Encode, Decode, Debug)]
+pub struct ProcessedParentchainBlock {
+	pub shard: ShardIdentifier,
+	pub block_hash: Hash,
+	pub trusted_calls_merkle_root: Hash,
+	pub block_number: BlockNumber,
+}
+
+impl core::fmt::Display for crate::parentchain::ProcessedParentchainBlock {
+	fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+		let message = format!(
+			"ProcessedParentchainBlock :: nr {} shard: {}, merkle: {:?}, block hash {:?}",
+			self.block_number, self.shard, self.trusted_calls_merkle_root, self.block_hash
+		);
+		write!(f, "{}", message)
+	}
+}
+
+impl StaticEvent for crate::parentchain::AddedSgxEnclave {
+	const PALLET: &'static str = "EnclaveBridge";
+	const EVENT: &'static str = "ProcessedParentchainBlock";
+}
+
+#[derive(Encode, Decode, Debug)]
+pub struct OracleUpdated {
+	pub oracle_data_name: PalletString,
+	pub data_source: PalletString,
+}
+
+impl core::fmt::Display for crate::parentchain::OracleUpdated {
+	fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+		let message = format!(
+			"OracleUpdated :: data name {:?} source: {:?}",
+			self.oracle_data_name, self.data_source,
+		);
+		write!(f, "{}", message)
+	}
+}
+
+impl StaticEvent for crate::parentchain::OracleUpdated {
+	const PALLET: &'static str = "Teeracle";
+	const EVENT: &'static str = "OracleUpdated";
+}
+
+#[derive(Encode, Decode, Debug)]
+pub struct ExchangeRateUpdated {
+	pub data_source: PalletString,
+	pub trading_pair: PalletString,
+	pub exchange_rate: ExchangeRate,
+}
+
+impl core::fmt::Display for crate::parentchain::ExchangeRateUpdated {
+	fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+		let message = format!(
+			"OracleUpdated :: source {:?} trading pair: {:?}",
+			self.data_source, self.trading_pair,
+		);
+		write!(f, "{}", message)
+	}
+}
+
+impl StaticEvent for crate::parentchain::ExchangeRateUpdated {
+	const PALLET: &'static str = "Teeracle";
+	const EVENT: &'static str = "ExchangeRateUpdated";
+}
+
+pub trait HandleParentchainEvents<Executor, TCS, Error>
+where
+	Executor: IndirectExecutor<TCS, Error>,
+	TCS: PartialEq + Encode + Decode + Debug + Clone + Send + Sync + TrustedCallVerification,
+{
+	fn handle_events(
+		executor: &Executor,
+		events: impl FilterEvents,
+		vault_account: &AccountId,
+	) -> core::result::Result<(), Error>;
+}
+
+#[derive(Debug)]
+pub enum ParentchainError {
+	ShieldFundsFailure,
+	FunctionalityDisabled,
+}
+
+impl core::fmt::Display for ParentchainError {
+	fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+		let message = match &self {
+			ParentchainError::ShieldFundsFailure => "Parentchain Error: ShieldFundsFailure",
+			ParentchainError::FunctionalityDisabled => "Parentchain Error: FunctionalityDisabled",
+		};
+		write!(f, "{}", message)
+	}
+}
+
+impl From<ParentchainError> for () {
+	fn from(_: ParentchainError) -> Self {}
+}
+
+/// a wrapper to target calls to specific parentchains
+#[derive(Encode, Debug, Clone, PartialEq, Eq)]
+pub enum ParentchainCall {
+	Integritee(OpaqueCall),
+	TargetA(OpaqueCall),
+	TargetB(OpaqueCall),
+}
+
+impl ParentchainCall {
+	pub fn as_integritee(&self) -> Option<OpaqueCall> {
+		if let Self::Integritee(call) = self {
+			Some(call.clone())
+		} else {
+			None
+		}
+	}
+	pub fn as_target_a(&self) -> Option<OpaqueCall> {
+		if let Self::TargetA(call) = self {
+			Some(call.clone())
+		} else {
+			None
+		}
+	}
+	pub fn as_target_b(&self) -> Option<OpaqueCall> {
+		if let Self::TargetB(call) = self {
+			Some(call.clone())
+		} else {
+			None
+		}
+	}
+	pub fn as_opaque_call_for(&self, parentchain_id: ParentchainId) -> Option<OpaqueCall> {
+		match parentchain_id {
+			ParentchainId::Integritee =>
+				if let Self::Integritee(call) = self {
+					Some(call.clone())
+				} else {
+					None
+				},
+			ParentchainId::TargetA =>
+				if let Self::TargetA(call) = self {
+					Some(call.clone())
+				} else {
+					None
+				},
+			ParentchainId::TargetB =>
+				if let Self::TargetB(call) = self {
+					Some(call.clone())
+				} else {
+					None
+				},
+		}
+	}
 }

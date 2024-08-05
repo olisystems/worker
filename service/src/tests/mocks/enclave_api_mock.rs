@@ -24,8 +24,12 @@ use itc_parentchain::primitives::{
 };
 use itp_enclave_api::{enclave_base::EnclaveBase, sidechain::Sidechain, EnclaveResult};
 use itp_settings::worker::MR_ENCLAVE_SIZE;
+use itp_stf_interface::ShardCreationInfo;
 use itp_storage::StorageProof;
-use itp_types::ShardIdentifier;
+use itp_types::{
+	parentchain::{Balance, Header},
+	ShardIdentifier,
+};
 use sgx_crypto_helper::rsa3072::Rsa3072PubKey;
 use sp_core::ed25519;
 
@@ -61,11 +65,25 @@ impl EnclaveBase for EnclaveMock {
 		unimplemented!()
 	}
 
-	fn init_proxied_shard_vault(&self, _shard: &ShardIdentifier) -> EnclaveResult<()> {
+	fn init_proxied_shard_vault(
+		&self,
+		_shard: &ShardIdentifier,
+		_parentchain_id: &ParentchainId,
+		_funding_balance: Balance,
+	) -> EnclaveResult<()> {
 		unimplemented!()
 	}
 
-	fn trigger_parentchain_block_import(&self, _: &ParentchainId) -> EnclaveResult<()> {
+	fn init_shard_creation_parentchain_header(
+		&self,
+		shard: &ShardIdentifier,
+		parentchain_id: &ParentchainId,
+		header: &Header,
+	) -> EnclaveResult<()> {
+		unimplemented!()
+	}
+
+	fn get_shard_creation_info(&self, shard: &ShardIdentifier) -> EnclaveResult<ShardCreationInfo> {
 		unimplemented!()
 	}
 
@@ -101,6 +119,7 @@ impl Sidechain for EnclaveMock {
 		_events: &[Vec<u8>],
 		_events_proofs: &[StorageProof],
 		_: &ParentchainId,
+		_: bool,
 	) -> EnclaveResult<()> {
 		Ok(())
 	}

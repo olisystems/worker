@@ -13,7 +13,6 @@ log = { version = "0.4", default-features = false }
 sgx_tstd = { branch = "master", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 
 # substrate deps
-frame-support = { default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.42" }
 sp-core = { default-features = false, features = ["full_crypto"], git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.42" }
 sp-runtime = { default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.42" }
 
@@ -58,7 +57,6 @@ std = [
     "finality-grandpa/std",
     "log/std",
     #substrate
-    "frame-support/std",
     "sp-core/std",
     "sp-runtime/std",
     #local
@@ -73,6 +71,7 @@ std = [
     "itp-stf-state-handler/std",
     "itp-time-utils/std",
     "itp-types/std",
+    "itp-utils/std",
     "its-block-composer/std",
     "its-block-verification/std",
     "its-consensus-common/std",

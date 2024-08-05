@@ -29,14 +29,13 @@ use crate::test::{
 	},
 };
 use codec::Encode;
+use ita_parentchain_interface::integritee;
 use ita_stf::{
 	test_genesis::{endowed_account, unendowed_account},
 	Getter, TrustedCall, TrustedCallSigned,
 };
 use itc_parentchain::indirect_calls_executor::{
-	filter_metadata::{ShieldFundsAndInvokeFilter, TestEventCreator},
-	parentchain_parser::ParentchainExtrinsicParser,
-	ExecuteIndirectCalls, IndirectCallsExecutor,
+	mock::TestEventCreator, ExecuteIndirectCalls, IndirectCallsExecutor,
 };
 use itc_parentchain_test::{ParentchainBlockBuilder, ParentchainHeaderBuilder};
 use itp_node_api::{
@@ -56,7 +55,10 @@ use itp_stf_primitives::{traits::TrustedCallVerification, types::TrustedOperatio
 use itp_stf_state_observer::mock::ObserveStateMock;
 use itp_test::mock::metrics_ocall_mock::MetricsOCallMock;
 use itp_top_pool_author::{top_filter::AllowAllTopsFilter, traits::AuthorApi};
-use itp_types::{parentchain::Address, AccountId, Block, ShardIdentifier, ShieldFundsFn, H256};
+use itp_types::{
+	parentchain::{Address, ParentchainId},
+	AccountId, Block, ShardIdentifier, ShieldFundsFn, H256,
+};
 use jsonrpc_core::futures::executor;
 use log::*;
 use sgx_crypto_helper::RsaKeyPair;
@@ -82,7 +84,7 @@ pub fn process_indirect_call_in_top_pool() {
 	let top_pool_author = Arc::new(TestTopPoolAuthor::new(
 		top_pool,
 		AllowAllTopsFilter::<TrustedCallSigned, Getter>::new(),
-		state_handler.clone(),
+		state_handler,
 		shielding_key_repo,
 		Arc::new(MetricsOCallMock::default()),
 	));
@@ -100,7 +102,7 @@ pub fn submit_shielding_call_to_top_pool() {
 
 	let signer = TestSigner::from_seed(b"42315678901234567890123456789012");
 	let shielding_key = TestShieldingKey::new().unwrap();
-	let shielding_key_repo = Arc::new(TestShieldingKeyRepo::new(shielding_key.clone()));
+	let shielding_key_repo = Arc::new(TestShieldingKeyRepo::new(shielding_key));
 	let header = ParentchainHeaderBuilder::default().build();
 
 	let ocall_api = create_ocall_api(&header, &signer);
@@ -123,23 +125,29 @@ pub fn submit_shielding_call_to_top_pool() {
 	let enclave_signer =
 		Arc::new(StfEnclaveSigner::<_, _, _, TestStf, _, TrustedCallSigned, Getter>::new(
 			state_observer,
-			ocall_api.clone(),
+			ocall_api,
 			shielding_key_repo.clone(),
 			top_pool_author.clone(),
 		));
 	let node_meta_data_repository = Arc::new(NodeMetadataRepository::default());
 	node_meta_data_repository.set_metadata(NodeMetadataMock::new());
-	let indirect_calls_executor =
-		IndirectCallsExecutor::<
-			_,
-			_,
-			_,
-			_,
-			ShieldFundsAndInvokeFilter<ParentchainExtrinsicParser>,
-			TestEventCreator,
-		>::new(
-			shielding_key_repo, enclave_signer, top_pool_author.clone(), node_meta_data_repository
-		);
+	let indirect_calls_executor = IndirectCallsExecutor::<
+		_,
+		_,
+		_,
+		_,
+		integritee::ExtrinsicFilter,
+		TestEventCreator,
+		integritee::ParentchainEventHandler,
+		TrustedCallSigned,
+		Getter,
+	>::new(
+		shielding_key_repo,
+		enclave_signer,
+		top_pool_author.clone(),
+		node_meta_data_repository,
+		ParentchainId::Integritee,
+	);
 
 	let block_with_shielding_call = create_shielding_call_extrinsic(shard_id, &shielding_key);
 
@@ -194,7 +202,12 @@ fn create_shielding_call_extrinsic<ShieldingKey: ShieldingCryptoEncrypt>(
 	let shield_funds_indexes = dummy_node_metadata.shield_funds_call_indexes().unwrap();
 	let opaque_extrinsic = OpaqueExtrinsic::from_bytes(
 		ParentchainUncheckedExtrinsic::<ShieldFundsFn>::new_signed(
-			(shield_funds_indexes, shard, target_account, 1000u128),
+			(
+				shield_funds_indexes,
+				shard,
+				target_account,
+				ita_stf::test_genesis::SECOND_ENDOWED_ACC_FUNDS,
+			),
 			Address::Address32([1u8; 32]),
 			MultiSignature::Ed25519(signature),
 			default_extra_for_test.signed_extra(),

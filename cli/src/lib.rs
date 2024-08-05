@@ -32,7 +32,6 @@ mod attesteer;
 mod base_cli;
 mod benchmark;
 mod command_utils;
-mod error;
 #[cfg(feature = "evm")]
 mod evm;
 #[cfg(feature = "teeracle")]
@@ -125,6 +124,8 @@ pub enum CliError {
 	TrustedOp { msg: String },
 	#[error("EvmReadCommands error: {:?}", msg)]
 	EvmRead { msg: String },
+	#[error("worker rpc api error: {:?}", msg)]
+	WorkerRpcApi { msg: String },
 }
 
 pub type CliResult = Result<CliResultOk, CliError>;

@@ -1,6 +1,6 @@
 services:
   "integritee-node-${VERSION}":
-    image: "${INTEGRITEE_NODE:-integritee/integritee-node:1.1.3}"
+    image: "${INTEGRITEE_NODE:-integritee/integritee-node:1.13.0}"
     hostname: integritee-node
     devices:
       - "${SGX_PROVISION:-/dev/null}:/dev/sgx/provision"
@@ -15,7 +15,7 @@ services:
       interval: 10s
       timeout: 10s
       retries: 6
-    command: -lruntime=info -lteerex=debug --dev --rpc-methods unsafe --ws-external --rpc-external --ws-port 9912
+    command: -lruntime=info -lteerex=debug --dev --rpc-methods unsafe --rpc-external --rpc-port 9912
     #logging:
     #driver: local
   "integritee-worker-1-${VERSION}":
@@ -35,7 +35,7 @@ services:
       - "${AESMD:-/dev/null}:/var/run/aesmd"
       - "${SGX_QCNL:-/dev/null}:/etc/sgx_default_qcnl.conf"
     environment:
-      - RUST_LOG=warn,ws=warn,sp_io=warn,substrate_api_client=warn,jsonrpsee_ws_client=warn,jsonrpsee_ws_server=warn,enclave_runtime=warn,integritee_service=warn,ita_stf=debug
+      - RUST_LOG=info,substrate_api_client=warn,ws=warn,mio=warn,ac_node_api=warn,sp_io=warn,tungstenite=warn,integritee_service=debug,enclave_runtime=debug
     networks:
       - integritee-test-network
     healthcheck:
@@ -43,8 +43,7 @@ services:
       interval: 10s
       timeout: 10s
       retries: 25
-    # OLI: added --skip-ra`
-    command: "--clean-reset --data-dir /tmp/worker1 --ws-external -M integritee-worker-1 -T wss://integritee-worker-1 -u ws://integritee-node -U ws://integritee-worker-1 -P 2011 -w 2101 -p 9912 -h 4645 run --dev ${ADDITIONAL_RUNTIME_FLAGS} --skip-ra"
+    command: "--clean-reset --data-dir /tmp/worker1 --ws-external -M integritee-worker-1 -T wss://integritee-worker-1 -u ws://integritee-node -U ws://integritee-worker-1 -P 2011 -w 2101 -p 9912 -h 4645 run --dev ${ADDITIONAL_RUNTIME_FLAGS}"
     restart: "no"
   "integritee-worker-2-${VERSION}":
     image: integritee-worker:${VERSION:-dev}
@@ -65,7 +64,7 @@ services:
       - "${AESMD:-/dev/null}:/var/run/aesmd"
       - "${SGX_QCNL:-/dev/null}:/etc/sgx_default_qcnl.conf"
     environment:
-      - RUST_LOG=warn,ws=warn,sp_io=warn,substrate_api_client=warn,jsonrpsee_ws_client=warn,jsonrpsee_ws_server=warn,enclave_runtime=warn,integritee_service=warn,ita_stf=warn,its_consensus_common=debug
+      - RUST_LOG=info,substrate_api_client=warn,ws=warn,mio=warn,ac_node_api=warn,sp_io=warn,tungstenite=warn,integritee_service=debug,enclave_runtime=debug
     networks:
       - integritee-test-network
     healthcheck:
@@ -73,8 +72,7 @@ services:
       interval: 10s
       timeout: 10s
       retries: 25
-    # OLI: added --skip-ra
-    command: "--clean-reset --data-dir /tmp/worker2 --ws-external -M integritee-worker-2 -T wss://integritee-worker-2 -u ws://integritee-node -U ws://integritee-worker-2 -P 2012 -w 2102 -p 9912 -h 4646 run --dev --request-state ${ADDITIONAL_RUNTIME_FLAGS} --skip-ra"
+    command: "--clean-reset --data-dir /tmp/worker2 --ws-external -M integritee-worker-2 -T wss://integritee-worker-2 -u ws://integritee-node -U ws://integritee-worker-2 -P 2012 -w 2102 -p 9912 -h 4646 run --dev ${ADDITIONAL_RUNTIME_FLAGS}"
     restart: "no"
 networks:
   integritee-test-network:

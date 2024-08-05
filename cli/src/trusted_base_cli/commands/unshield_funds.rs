@@ -22,14 +22,13 @@ use crate::{
 	trusted_operation::perform_trusted_operation,
 	Cli, CliResult, CliResultOk,
 };
-use codec::Decode;
+use ita_parentchain_interface::integritee::Balance;
 use ita_stf::{Getter, Index, TrustedCall, TrustedCallSigned};
 use itp_stf_primitives::{
 	traits::TrustedCallSigning,
 	types::{KeyPair, TrustedOperation},
 };
 use log::*;
-use my_node_runtime::Balance;
 use sp_core::{crypto::Ss58Codec, Pair};
 use std::boxed::Box;
 #[derive(Parser)]
@@ -64,6 +63,6 @@ impl UnshieldFundsCommand {
 			TrustedCall::balance_unshield(from.public().into(), to, self.amount, shard)
 				.sign(&KeyPair::Sr25519(Box::new(from)), nonce, &mrenclave, &shard)
 				.into_trusted_operation(trusted_args.direct);
-		Ok(perform_trusted_operation(cli, trusted_args, &top).map(|_| CliResultOk::None)?)
+		Ok(perform_trusted_operation::<()>(cli, trusted_args, &top).map(|_| CliResultOk::None)?)
 	}
 }
